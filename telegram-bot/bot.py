@@ -335,6 +335,9 @@ last_tap = {}
 
 match_running = False
 
+_tap_lock = threading.Lock()
+_raid_lock = threading.Lock()
+
 tournament_players = []
 
 tournament_winners = []
@@ -2424,7 +2427,7 @@ def run_match(
         except:
             pass
 
-        time.sleep(0.3)
+        time.sleep(1.0)
 
     # =====================================================
     # END MATCH
@@ -2513,59 +2516,53 @@ def tap_button(update, context):
 
     # MATCH ENDED
     if not taprace_active:
-
-        q.answer(
-            "🏁 Match ended!"
-        )
-
+        try:
+            q.answer("🏁 Match ended!")
+        except:
+            pass
         return
 
     # WAIT FOR GO
     if not taprace_started:
-
-        q.answer(
-            "⏳ Wait for GO!"
-        )
-
+        try:
+            q.answer("⏳ Wait for GO!")
+        except:
+            pass
         return
 
     # NOT PARTICIPATING
     if uid not in taprace_match:
-
-        q.answer(
-            "❌ NOT YOUR MATCH"
-        )
-
+        try:
+            q.answer("❌ NOT YOUR MATCH")
+        except:
+            pass
         return
 
     # =====================================================
-    # ANTI SPAM DELAY
+    # ANSWER IMMEDIATELY — clears Telegram loading spinner
+    # =====================================================
+    try:
+        q.answer()
+    except:
+        pass
+
+    # =====================================================
+    # ANTI SPAM DELAY + THREAD-SAFE TAP COUNT
     # =====================================================
 
     current = time.time()
 
-    if uid in last_tap:
+    with _tap_lock:
 
-        if current - last_tap[uid] < 0.03:
+        if uid in last_tap and current - last_tap[uid] < 0.03:
             return
 
-    last_tap[uid] = current
+        last_tap[uid] = current
 
-    # SAFETY
-    if uid not in taprace_taps:
+        if uid not in taprace_taps:
+            taprace_taps[uid] = 0
 
-        taprace_taps[uid] = 0
-
-    # ADD TAP
-    taprace_taps[uid] += 1
-
-    # BUTTON RESPONSE
-    try:
-
-        q.answer()
-
-    except:
-        pass
+        taprace_taps[uid] += 1
 
 # =========================================================
 # RESET TOURNAMENT
@@ -3226,11 +3223,10 @@ def raid_attack(update, context):
             user_team = t
 
     if not user_team:
-
-        query.answer(
-            "❌ JOIN A TEAM FIRST"
-        )
-
+        try:
+            query.answer("❌ JOIN A TEAM FIRST")
+        except:
+            pass
         return
 
     # RANDOM DAMAGE
@@ -3240,29 +3236,31 @@ def raid_attack(update, context):
         3500
     )
 
-    # SAVE DAMAGE
+    # THREAD-SAFE HP + DAMAGE UPDATE
 
-    if user.id not in boss_raid["damage"]:
+    with _raid_lock:
 
-        boss_raid["damage"][user.id] = {
+        if user.id not in boss_raid["damage"]:
+            boss_raid["damage"][user.id] = {
+                "name": user.first_name,
+                "damage": 0
+            }
 
-            "name": user.first_name,
-            "damage": 0
+        boss_raid["damage"][user.id]["damage"] += damage
 
-        }
+        boss_raid["boss_hp"] -= damage
 
-    boss_raid["damage"][user.id]["damage"] += damage
-
-    # REMOVE HP
-
-    boss_raid["boss_hp"] -= damage
-
-    if boss_raid["boss_hp"] < 0:
-
-        boss_raid["boss_hp"] = 0
+        if boss_raid["boss_hp"] < 0:
+            boss_raid["boss_hp"] = 0
 
     hp = boss_raid["boss_hp"]
     max_hp = boss_raid["max_hp"]
+
+    # ANSWER IMMEDIATELY — clears loading spinner
+    try:
+        query.answer(f"-{damage} HP")
+    except:
+        pass
 
     percent = int(
         (
@@ -3329,10 +3327,6 @@ DEALT {damage} DAMAGE
             keyboard
         )
 
-    )
-
-    query.answer(
-        f"-{damage} HP"
     )
 
     # =========================================================
@@ -3448,14 +3442,16 @@ dp.add_handler(
 dp.add_handler(
     CallbackQueryHandler(
         join_raid_team,
-        pattern="raid_team"
+        pattern="raid_team",
+        run_async=True,
     )
 )
 
 dp.add_handler(
     CallbackQueryHandler(
         raid_attack,
-        pattern="raid_attack"
+        pattern="raid_attack",
+        run_async=True,
     )
 )
 
@@ -3562,28 +3558,32 @@ dp.add_handler(
 dp.add_handler(
     CallbackQueryHandler(
         join_giveaway,
-        pattern="join_giveaway"
+        pattern="join_giveaway",
+        run_async=True,
     )
 )
 
 dp.add_handler(
     CallbackQueryHandler(
         join_premium,
-        pattern="join_premium"
+        pattern="join_premium",
+        run_async=True,
     )
 )
 
 dp.add_handler(
     CallbackQueryHandler(
         join_taprace,
-        pattern="join_taprace"
+        pattern="join_taprace",
+        run_async=True,
     )
 )
 
 dp.add_handler(
     CallbackQueryHandler(
         tap_button,
-        pattern="tap_button"
+        pattern="tap_button",
+        run_async=True,
     )
 )
 
