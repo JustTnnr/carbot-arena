@@ -2732,7 +2732,8 @@ f"""
 
 updater = Updater(
     TOKEN,
-    use_context=True
+    use_context=True,
+    workers=8,
 )
 
 dp = updater.dispatcher
