@@ -192,6 +192,11 @@ function serializeState(s: Session, requestPlayerId?: string) {
       totalDamage: t.totalDamage,
       memberCount: t.memberIds.length,
       full: t.memberIds.length >= MAX_TEAM_SIZE,
+      members: t.memberIds
+        .map((pid) => s.players.get(pid))
+        .filter((p): p is PlayerRecord => !!p)
+        .sort((a, b) => b.score - a.score)
+        .map((p) => ({ name: p.name, score: p.score })),
     }));
     let myTeamIdx: number | null = null;
     if (requestPlayerId) {
@@ -263,14 +268,37 @@ function finishSession(s: Session, reason: "time" | "boss_killed") {
     s.winnerTeamIdx = winTeam?.idx ?? null;
     s.winnerName = winTeam ? `Team ${winTeam.name}` : null;
 
+    // Build winner team member list (by name + individual damage)
+    let winnerMembersBlock = "";
+    if (winTeam) {
+      const memberLines = winTeam.memberIds
+        .map((pid) => s.players.get(pid))
+        .filter((p): p is PlayerRecord => !!p)
+        .sort((a, b) => b.score - a.score)
+        .map((p) => {
+          const handle = p.telegramUsername ? ` (@${escapeHtml(p.telegramUsername)})` : "";
+          return `  • <b>${escapeHtml(p.name)}</b>${handle} — ${p.score.toLocaleString()} dmg`;
+        });
+      if (memberLines.length) {
+        winnerMembersBlock = `\n<b>Team ${escapeHtml(winTeam.name)} members:</b>\n${memberLines.join("\n")}\n`;
+      }
+    }
+
     const lines = teamsById
       .filter((t) => t.totalDamage > 0)
-      .slice(0, 6)
-      .map((t, i) => `${i + 1}. <b>Team ${escapeHtml(t.name)}</b> — ${t.totalDamage.toLocaleString()} dmg (${t.memberIds.length} member${t.memberIds.length !== 1 ? "s" : ""})`);
+      .slice(0, 8)
+      .map((t, i) => {
+        const memberNames = t.memberIds
+          .map((pid) => s.players.get(pid)?.name ?? "?")
+          .map(escapeHtml)
+          .join(", ");
+        return `${i + 1}. <b>Team ${escapeHtml(t.name)}</b> — ${t.totalDamage.toLocaleString()} dmg` +
+          (memberNames ? ` (${memberNames})` : "");
+      });
     text =
       `👹 <b>WEB TEAM BOSS RAID FINISHED</b>\n\n` +
-      (winTeam ? `🏆 Winner: <b>Team ${escapeHtml(winTeam.name)}</b> with ${winTeam.totalDamage.toLocaleString()} dmg!\n\n` : "") +
-      `<b>Team Rankings:</b>\n${lines.join("\n") || "No teams participated."}`;
+      (winTeam ? `🏆 Winner: <b>Team ${escapeHtml(winTeam.name)}</b> with ${winTeam.totalDamage.toLocaleString()} dmg!\n${winnerMembersBlock}\n` : "") +
+      `<b>All Team Rankings:</b>\n${lines.join("\n") || "No teams participated."}`;
   }
 
   void postToTelegram(s.chatId, text);

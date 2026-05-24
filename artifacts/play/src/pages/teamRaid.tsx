@@ -18,12 +18,15 @@ async function jsonPost<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+type TeamMember = { name: string; score: number };
+
 type TeamInfo = {
   teamIdx: number;
   name: string;
   totalDamage: number;
   memberCount: number;
   full: boolean;
+  members: TeamMember[];
 };
 
 type TeamRaidState = {
@@ -276,37 +279,84 @@ export default function TeamRaidPage() {
       <Shell>
         <div className="space-y-4">
           <div className="text-center">
-            <div className="text-5xl mb-2">{winnerTeam ? "🏆" : "💀"}</div>
-            <h1 className="text-xl font-bold">Raid Over!</h1>
+            <div className="text-5xl mb-2">💀</div>
+            <h1 className="text-xl font-bold">Boss Defeated!</h1>
             {winnerTeam && (
-              <div className="mt-2 text-yellow-300 font-bold text-lg">
-                {winnerTeam.name} Wins!
+              <div className="mt-1 text-yellow-300 font-bold text-lg">
+                🏆 {winnerTeam.name} Wins!
               </div>
             )}
           </div>
-          {myTeam && (
-            <div className={`rounded-2xl bg-gradient-to-br ${teamColor(myTeamIdx ?? 0)} p-4 border border-white/20 text-center`}>
-              <div className="text-sm opacity-80">Your team damage</div>
-              <div className="text-4xl font-black">{myTeam.totalDamage.toLocaleString()}</div>
-              <div className="text-sm opacity-80">Your personal dmg: {myScore.toLocaleString()}</div>
+
+          {/* Winning team members */}
+          {winnerTeam && (
+            <div className={`rounded-2xl bg-gradient-to-br ${teamColor(winnerIdx ?? 0)} border border-white/30 p-4`}>
+              <div className="text-sm font-bold uppercase tracking-wide opacity-80 mb-2">
+                🏆 {winnerTeam.name} — {winnerTeam.totalDamage.toLocaleString()} dmg
+              </div>
+              {winnerTeam.members.length > 0 ? (
+                <ul className="space-y-1">
+                  {winnerTeam.members.map((m, i) => (
+                    <li key={i} className="flex justify-between items-center bg-black/20 rounded-lg px-3 py-2 text-sm">
+                      <span className="flex items-center gap-2">
+                        <span className="text-yellow-300 font-bold">{i === 0 ? "👑" : `#${i + 1}`}</span>
+                        <span className="font-semibold">{m.name}</span>
+                      </span>
+                      <span className="font-mono">{m.score.toLocaleString()} <span className="opacity-70">dmg</span></span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="text-sm opacity-70">No members recorded</div>
+              )}
             </div>
           )}
+
+          {/* Your team result (if not the winner) */}
+          {myTeam && myTeamIdx !== winnerIdx && (
+            <div className={`rounded-2xl bg-gradient-to-br ${teamColor(myTeamIdx ?? 0)} p-4 border border-white/20`}>
+              <div className="text-sm opacity-80 mb-1">Your team — {myTeam.name}</div>
+              <div className="flex justify-between items-center">
+                <span className="font-bold">Team damage</span>
+                <span className="font-mono font-bold">{myTeam.totalDamage.toLocaleString()}</span>
+              </div>
+              {myTeam.members.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {myTeam.members.map((m, i) => (
+                    <li key={i} className="flex justify-between text-sm bg-black/20 rounded-lg px-3 py-1">
+                      <span>{m.name}</span>
+                      <span className="font-mono">{m.score.toLocaleString()} dmg</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {/* Full team rankings */}
           <div className="rounded-2xl bg-white/10 border border-white/20 p-4">
-            <div className="font-semibold mb-3">Team Leaderboard</div>
+            <div className="font-semibold mb-3 text-sm">All Team Rankings</div>
             <ul className="space-y-2">
               {sortedTeams.filter(t => t.totalDamage > 0).map((t, i) => (
                 <li
                   key={t.teamIdx}
-                  className={`flex items-center justify-between px-3 py-2 rounded-lg ${
-                    t.teamIdx === myTeamIdx ? "bg-yellow-400/20" : "bg-white/5"
-                  } ${t.teamIdx === winnerIdx ? "ring-2 ring-yellow-400" : ""}`}
+                  className={`px-3 py-2 rounded-lg ${
+                    t.teamIdx === winnerIdx ? "bg-yellow-400/20 ring-1 ring-yellow-400" :
+                    t.teamIdx === myTeamIdx ? "bg-rose-500/20 ring-1 ring-rose-400" : "bg-white/5"
+                  }`}
                 >
-                  <span className="flex items-center gap-2">
-                    <span className="w-5 text-rose-300 text-sm">{i + 1}</span>
-                    <span className="font-semibold">{t.name}</span>
-                    <span className="text-xs text-rose-300">{t.memberCount} member{t.memberCount !== 1 ? "s" : ""}</span>
-                  </span>
-                  <span className="font-mono font-semibold">{t.totalDamage.toLocaleString()} <span className="text-xs text-rose-300">dmg</span></span>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <span className="w-5 text-rose-300 text-sm">{i + 1}</span>
+                      <span className="font-semibold">{t.name}</span>
+                    </span>
+                    <span className="font-mono font-semibold text-sm">{t.totalDamage.toLocaleString()} <span className="text-xs text-rose-300">dmg</span></span>
+                  </div>
+                  {t.members.length > 0 && (
+                    <div className="mt-1 ml-7 text-xs text-rose-200 opacity-80">
+                      {t.members.map((m) => `${m.name} (${m.score.toLocaleString()})`).join(" · ")}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
