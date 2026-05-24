@@ -19,12 +19,20 @@ type Session = {
   createdAt: number;
   startsAt: number;
   endsAt: number;
+  playDurationMs: number;
+  manualStart: boolean;
   bossHp?: number;
   bossMaxHp?: number;
   players: Map<string, PlayerRecord>;
   winnerName: string | null;
   resultsPosted: boolean;
 };
+
+// Latest active session per chat (for bot /startrace lookups)
+const latestByChat = new Map<string, string>();
+function chatKey(chatId: number, type: "tap" | "raid"): string {
+  return `${chatId}:${type}`;
+}
 
 const sessions = new Map<string, Session>();
 
@@ -57,6 +65,8 @@ function serializeState(s: Session) {
     startsAt: s.startsAt,
     endsAt: s.endsAt,
     serverTime: Date.now(),
+    manualStart: s.manualStart,
+    awaitingAdminStart: s.manualStart && s.status === "lobby",
     players,
     bossHp: s.bossHp ?? null,
     bossMaxHp: s.bossMaxHp ?? null,
@@ -129,7 +139,7 @@ function escapeHtml(s: string): string {
 
 function tickSession(s: Session): void {
   const now = Date.now();
-  if (s.status === "lobby" && now >= s.startsAt) {
+  if (s.status === "lobby" && !s.manualStart && now >= s.startsAt) {
     s.status = "running";
   }
   if (s.status === "running" && now >= s.endsAt) {
@@ -160,6 +170,7 @@ router.post("/play/session", (req: Request, res: Response) => {
     lobbyDurationMs?: number;
     playDurationMs?: number;
     bossHp?: number;
+    manualStart?: boolean;
   };
   if (body.type !== "tap" && body.type !== "raid") {
     res.status(400).json({ error: "invalid type" });
@@ -169,21 +180,25 @@ router.post("/play/session", (req: Request, res: Response) => {
     res.status(400).json({ error: "chatId required" });
     return;
   }
+  const manualStart = body.manualStart === true;
   const lobby = Math.max(0, Math.min(120_000, body.lobbyDurationMs ?? 15_000));
   const play = Math.max(
     5_000,
-    Math.min(120_000, body.playDurationMs ?? (body.type === "tap" ? 20_000 : 60_000)),
+    Math.min(300_000, body.playDurationMs ?? (body.type === "tap" ? 20_000 : 60_000)),
   );
   const now = Date.now();
   const sessionId = newId(body.type === "tap" ? "tap" : "raid");
+  const FAR_FUTURE = now + 365 * 24 * 60 * 60 * 1000;
   const s: Session = {
     sessionId,
     type: body.type,
     chatId: body.chatId,
-    status: lobby > 0 ? "lobby" : "running",
+    status: manualStart || lobby > 0 ? "lobby" : "running",
     createdAt: now,
-    startsAt: now + lobby,
-    endsAt: now + lobby + play,
+    startsAt: manualStart ? FAR_FUTURE : now + lobby,
+    endsAt: manualStart ? FAR_FUTURE : now + lobby + play,
+    playDurationMs: play,
+    manualStart,
     players: new Map(),
     winnerName: null,
     resultsPosted: false,
@@ -194,9 +209,67 @@ router.post("/play/session", (req: Request, res: Response) => {
     s.bossMaxHp = hp;
   }
   sessions.set(sessionId, s);
+  latestByChat.set(chatKey(body.chatId, body.type), sessionId);
   const base = getPublicBaseUrl();
   const url = `${base}/play/${body.type}/${sessionId}`;
   res.json({ sessionId, url });
+});
+
+router.post("/play/session/:id/start", (req: Request, res: Response) => {
+  const provided = req.header("x-bot-secret") ?? "";
+  if (!PLAY_BOT_SECRET || provided !== PLAY_BOT_SECRET) {
+    res.status(403).json({ error: "forbidden" });
+    return;
+  }
+  const idParam = req.params["id"];
+  const s = sessions.get(typeof idParam === "string" ? idParam : "");
+  if (!s) {
+    res.status(404).json({ error: "not found" });
+    return;
+  }
+  if (s.status === "finished") {
+    res.status(409).json({ error: "session finished" });
+    return;
+  }
+  if (s.status === "running") {
+    res.json({ ok: true, alreadyRunning: true });
+    return;
+  }
+  const now = Date.now();
+  s.status = "running";
+  s.startsAt = now;
+  s.endsAt = now + s.playDurationMs;
+  res.json({ ok: true, endsAt: s.endsAt, players: s.players.size });
+});
+
+router.get("/play/chat/:chatId/latest/:type", (req: Request, res: Response) => {
+  const provided = req.header("x-bot-secret") ?? "";
+  if (!PLAY_BOT_SECRET || provided !== PLAY_BOT_SECRET) {
+    res.status(403).json({ error: "forbidden" });
+    return;
+  }
+  const chatIdRaw = req.params["chatId"];
+  const typeRaw = req.params["type"];
+  const chatId = Number(typeof chatIdRaw === "string" ? chatIdRaw : "");
+  if (!Number.isFinite(chatId)) {
+    res.status(400).json({ error: "bad chatId" });
+    return;
+  }
+  if (typeRaw !== "tap" && typeRaw !== "raid") {
+    res.status(400).json({ error: "bad type" });
+    return;
+  }
+  const id = latestByChat.get(chatKey(chatId, typeRaw));
+  if (!id) {
+    res.status(404).json({ error: "no session" });
+    return;
+  }
+  const s = sessions.get(id);
+  if (!s) {
+    res.status(404).json({ error: "no session" });
+    return;
+  }
+  res.json({ sessionId: s.sessionId, status: s.status, playerCount: s.players.size });
 });
 
 router.get("/play/session/:id", (req: Request, res: Response) => {

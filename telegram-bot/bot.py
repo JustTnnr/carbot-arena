@@ -3578,8 +3578,8 @@ def webtap(update, context):
         body = _create_web_session({
             "type": "tap",
             "chatId": chat_id,
-            "lobbyDurationMs": 15000,
             "playDurationMs": 20000,
+            "manualStart": True,
         })
     except Exception as e:
         update.message.reply_text(f"❌ Could not create session: {e}")
@@ -3587,8 +3587,9 @@ def webtap(update, context):
     url = body.get("url", "")
     text = (
         "⚡ <b>WEB TAP RACE</b> ⚡\n\n"
-        "Click the link, enter your name, and tap as fast as you can!\n"
-        f"⏱ Lobby: 15s • Race: 20s\n\n"
+        "Click the link and enter your name to join the lobby.\n"
+        "An admin will run /startrace when everyone's in.\n"
+        f"⏱ Race length: 20s\n\n"
         f"🔗 <a href=\"{url}\">JOIN THE RACE</a>"
     )
     keyboard = InlineKeyboardMarkup([[
@@ -3597,6 +3598,70 @@ def webtap(update, context):
     context.bot.send_message(
         chat_id, text, parse_mode="HTML",
         reply_markup=keyboard, disable_web_page_preview=True,
+    )
+
+def _get_latest_session(chat_id, type_):
+    secret = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    req = urllib.request.Request(
+        f"{_api_base()}/play/chat/{chat_id}/latest/{type_}",
+        headers={"X-Bot-Secret": secret},
+        method="GET",
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+def _start_session(session_id):
+    secret = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    req = urllib.request.Request(
+        f"{_api_base()}/play/session/{session_id}/start",
+        data=b"",
+        headers={
+            "Content-Type": "application/json",
+            "X-Bot-Secret": secret,
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+def startrace(update, context):
+    if not is_admin(update):
+        return
+    chat_id = update.effective_chat.id
+    try:
+        latest = _get_latest_session(chat_id, "tap")
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            update.message.reply_text(
+                "❌ No tap race here. Run /webtap first."
+            )
+            return
+        update.message.reply_text(f"❌ Lookup failed: {e}")
+        return
+    except Exception as e:
+        update.message.reply_text(f"❌ Lookup failed: {e}")
+        return
+    status = latest.get("status")
+    session_id = latest.get("sessionId")
+    if status == "finished":
+        update.message.reply_text(
+            "❌ The last race already finished. Run /webtap to start a new one."
+        )
+        return
+    if status == "running":
+        update.message.reply_text("⚠️ The race is already running!")
+        return
+    try:
+        result = _start_session(session_id)
+    except Exception as e:
+        update.message.reply_text(f"❌ Start failed: {e}")
+        return
+    players = result.get("players", latest.get("playerCount", 0))
+    update.message.reply_text(
+        f"🏁 <b>RACE STARTED!</b>\n\n"
+        f"👥 {players} player(s) in the lobby\n"
+        f"⏱ 20 seconds — tap your hearts out!",
+        parse_mode="HTML",
     )
 
 def webraid(update, context):
@@ -3632,6 +3697,7 @@ def webraid(update, context):
 
 dp.add_handler(CommandHandler("webtap", webtap))
 dp.add_handler(CommandHandler("webraid", webraid))
+dp.add_handler(CommandHandler("startrace", startrace))
 
 # =========================================================
 # TAP RACE COMMANDS

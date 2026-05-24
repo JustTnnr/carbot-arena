@@ -162,10 +162,19 @@ export default function TapPage() {
             Tap Race
           </div>
           <div className="text-3xl font-bold">
-            {status === "lobby" && `Starts in ${Math.ceil(startsIn / 1000)}s`}
+            {status === "lobby" &&
+              ((state as { awaitingAdminStart?: boolean }).awaitingAdminStart
+                ? "Waiting for admin…"
+                : `Starts in ${Math.ceil(startsIn / 1000)}s`)}
             {status === "running" && `${Math.ceil(endsIn / 1000)}s left`}
             {status === "finished" && "Race finished"}
           </div>
+          {status === "lobby" &&
+            (state as { awaitingAdminStart?: boolean }).awaitingAdminStart && (
+              <div className="text-sm text-purple-200 mt-1">
+                Admin must run /startrace in Telegram to begin.
+              </div>
+            )}
         </div>
 
         <button
