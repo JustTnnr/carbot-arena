@@ -944,6 +944,32 @@ f"""
 """
     )
 
+def ping(update, context):
+    uptime_sec = int(time.time() - _HEALTH_START)
+    days = uptime_sec // 86400
+    hours = (uptime_sec % 86400) // 3600
+    mins = (uptime_sec % 3600) // 60
+    secs = uptime_sec % 60
+
+    if days > 0:
+        uptime_str = f"{days}d {hours}h {mins}m"
+    elif hours > 0:
+        uptime_str = f"{hours}h {mins}m {secs}s"
+    else:
+        uptime_str = f"{mins}m {secs}s"
+
+    border = random.choice(animated_borders)
+
+    update.message.reply_text(
+f"""{border}
+🏓 PONG!
+{border}
+✅ Bot is alive and running
+⏱ Uptime: {uptime_str}
+👥 Players tracked: {len(leaderboard)}
+{border}"""
+    )
+
 # =========================================================
 # PROFILE
 # =========================================================
@@ -3375,6 +3401,13 @@ dp.add_handler(
     CommandHandler(
         "start",
         start
+    )
+)
+
+dp.add_handler(
+    CommandHandler(
+        "ping",
+        ping
     )
 )
 
