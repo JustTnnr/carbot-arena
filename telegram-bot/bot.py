@@ -3591,9 +3591,16 @@ def webtap(update, context):
     url = body.get("url", "")
     text = (
         "⚡ <b>WEB TAP RACE</b> ⚡\n\n"
-        "Click the link and enter your name to join the lobby.\n"
-        "An admin will run /startrace when everyone's in.\n"
-        f"⏱ Race length: 30s — hit the green square, avoid the reds!\n\n"
+        "<b>How to play</b>\n"
+        "• Tap the link below and enter your name to join the lobby.\n"
+        "• Wait for an admin to run /startrace — a 10s countdown will appear here.\n"
+        "• When the race begins, the board is a 5×5 grid. Every square is red except ONE that turns green.\n\n"
+        "<b>Scoring (30 second race)</b>\n"
+        "✅ Tap the GREEN square → <b>+1 point</b>\n"
+        "❌ Tap a RED square → <b>−1 point</b>\n"
+        "❌ Tap a square too late (after it turns back to red) → <b>−1 point</b>\n\n"
+        "💡 Tip: blind spamming will lose you points — accuracy beats speed.\n"
+        "🏆 Highest score when the timer hits zero wins!\n\n"
         f"🔗 <a href=\"{url}\">JOIN THE RACE</a>"
     )
     # Channels don't allow web_app buttons — use a plain URL button.
