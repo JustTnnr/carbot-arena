@@ -129,11 +129,14 @@ components:
           type: integer
         userId:
           type: string
+        name:
+          type: ["string", "null"]
         score:
           type: integer
       required:
         - rank
         - userId
+        - name
         - score
 
     EventItem:

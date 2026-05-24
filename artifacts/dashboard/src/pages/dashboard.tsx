@@ -344,7 +344,7 @@ export default function Dashboard() {
                         {entry.rank}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-mono text-sm truncate text-foreground">{entry.userId}</div>
+                        <div className="font-mono text-sm truncate text-foreground">{entry.name ?? entry.userId}</div>
                       </div>
                       <div className="font-mono font-bold text-primary text-glow">
                         {formatNumber(entry.score)}

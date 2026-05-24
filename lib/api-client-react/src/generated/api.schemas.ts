@@ -20,6 +20,8 @@ export interface DashboardSummary {
 export interface LeaderboardEntry {
   rank: number;
   userId: string;
+  /** @nullable */
+  name: string | null;
   score: number;
 }
 

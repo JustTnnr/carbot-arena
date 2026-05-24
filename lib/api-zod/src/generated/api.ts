@@ -34,6 +34,7 @@ export const GetDashboardSummaryResponse = zod.object({
 export const GetDashboardLeaderboardResponseItem = zod.object({
   "rank": zod.number(),
   "userId": zod.string(),
+  "name": zod.string().nullable(),
   "score": zod.number()
 })
 export const GetDashboardLeaderboardResponse = zod.array(GetDashboardLeaderboardResponseItem)

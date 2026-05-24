@@ -55,9 +55,10 @@ router.get("/dashboard/summary", (_req, res) => {
 router.get("/dashboard/leaderboard", (_req, res) => {
   const data = readBotData();
   const leaderboard = (data.leaderboard as Record<string, number>) ?? {};
+  const playerNames = (data.player_names as Record<string, string>) ?? {};
 
   const entries = Object.entries(leaderboard)
-    .map(([userId, score]) => ({ userId, score }))
+    .map(([userId, score]) => ({ userId, name: playerNames[userId] ?? null, score }))
     .sort((a, b) => b.score - a.score)
     .map((entry, index) => ({ rank: index + 1, ...entry }));
 
@@ -101,13 +102,21 @@ router.get("/dashboard/tournament", (_req, res) => {
 
 router.get("/dashboard/live", (_req, res) => {
   const live = readLiveState();
+  const data = readBotData();
+  const playerNames = (data.player_names as Record<string, string>) ?? {};
   const botOnline = typeof live.timestamp === "number" && Date.now() / 1000 - (live.timestamp as number) < 30;
+
+  const rawTaps = (live.taprace_taps as Record<string, number>) ?? {};
+  const namedTaps: Record<string, number> = {};
+  for (const [uid, taps] of Object.entries(rawTaps)) {
+    namedTaps[playerNames[uid] ?? uid] = taps;
+  }
 
   res.json({
     tapRaceActive: (live.taprace_active as boolean) ?? false,
     tapRaceStarted: (live.taprace_started as boolean) ?? false,
     tapRaceMatch: (live.taprace_match as number[]) ?? [],
-    tapRaceTaps: (live.taprace_taps as Record<string, number>) ?? {},
+    tapRaceTaps: namedTaps,
     bossRaidActive: (live.boss_raid_active as boolean) ?? false,
     bossRaidStarted: (live.boss_raid_started as boolean) ?? false,
     bossRaidHp: (live.boss_raid_hp as number) ?? 0,

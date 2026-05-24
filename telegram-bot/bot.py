@@ -307,6 +307,8 @@ DATA_FILE = "bot_data.json"
 
 leaderboard = {}
 
+player_names = {}
+
 total_games = {}
 
 events = {
@@ -351,6 +353,7 @@ def save_data():
     data = {
 
         "leaderboard": leaderboard,
+        "player_names": player_names,
         "events": events,
         "tournament_players": tournament_players,
         "tournament_winners": tournament_winners
@@ -360,6 +363,9 @@ def save_data():
     with open(DATA_FILE, "w") as f:
 
         json.dump(data, f)
+
+def record_name(uid, user):
+    player_names[str(uid)] = safe_name(user)
 
 # =========================================================
 # LOAD SYSTEM
@@ -371,6 +377,7 @@ def load_data():
     global events
     global tournament_players
     global tournament_winners
+    global player_names
 
     if not os.path.exists(DATA_FILE):
         return
@@ -400,6 +407,10 @@ def load_data():
     tournament_players = data.get(
         "tournament_players",
         []
+    )
+
+    player_names.update(
+        data.get("player_names", {})
     )
 
     tournament_winners = data.get(
@@ -922,6 +933,8 @@ def start(update, context):
 
     border = random.choice(animated_borders)
 
+    record_name(update.message.from_user.id, update.message.from_user)
+
     update.message.reply_text(
 f"""
 {border}
@@ -1336,6 +1349,8 @@ def finish_event(
 
                 user = bot.get_chat(uid)
 
+                record_name(uid, user)
+
                 leaderboard[uid] = (
                     leaderboard.get(uid, 0) + 1
                 )
@@ -1397,6 +1412,8 @@ f"""
             user = bot.get_chat(
                 winner
             )
+
+            record_name(winner, user)
 
             leaderboard[winner] = (
                 leaderboard.get(
@@ -1542,6 +1559,8 @@ def join_giveaway(update, context):
 
     uid = q.from_user.id
 
+    record_name(uid, q.from_user)
+
     ev = events["giveaway"]
 
     if not ev:
@@ -1568,6 +1587,8 @@ def join_premium(update, context):
     q = update.callback_query
 
     uid = q.from_user.id
+
+    record_name(uid, q.from_user)
 
     ev = events["premium"]
 
@@ -1786,6 +1807,8 @@ f"""
 
         else:
 
+            record_name(user.id, user)
+
             leaderboard[user.id] = (
                 leaderboard.get(
                     user.id,
@@ -1970,6 +1993,8 @@ def join_taprace(update, context):
         return
 
     # ADD PLAYER
+    record_name(user.id, user)
+
     tournament_players.append(
         user.id
     )
@@ -2152,6 +2177,8 @@ f"""
     user = context.bot.get_chat(
         champion
     )
+
+    record_name(champion, user)
 
     leaderboard[champion] = (
         leaderboard.get(
