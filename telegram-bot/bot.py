@@ -301,6 +301,9 @@ TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 OWNER_ID = 6531314640
 EXTRA_ADMIN = 8650959684
 
+# Announcement channel — bot must be admin in this channel
+ANNOUNCE_CHANNEL = os.environ.get("ANNOUNCE_CHANNEL", "@TnnrCPM")
+
 DATA_FILE = "bot_data.json"
 
 # =========================================================
@@ -3698,6 +3701,68 @@ def webraid(update, context):
 dp.add_handler(CommandHandler("webtap", webtap))
 dp.add_handler(CommandHandler("webraid", webraid))
 dp.add_handler(CommandHandler("startrace", startrace))
+
+# =========================================================
+# ANNOUNCEMENT CHANNEL
+# =========================================================
+
+def announce(update, context):
+    """Send a message to the announcement channel.
+    Usage:
+      /announce <message>           — sends the text after the command
+      /announce (as a reply)        — forwards/sends the replied-to message text
+    """
+    if not is_admin(update):
+        return
+
+    msg = update.message
+    text = None
+    parse_mode = "HTML"
+
+    # Prefer text following the command
+    if context.args:
+        text = msg.text.split(None, 1)[1] if msg.text else " ".join(context.args)
+    # Otherwise use the message we're replying to
+    elif msg.reply_to_message and (msg.reply_to_message.text or msg.reply_to_message.caption):
+        text = msg.reply_to_message.text or msg.reply_to_message.caption
+
+    if not text:
+        msg.reply_text(
+            "Usage:\n"
+            "• <code>/announce your message here</code>\n"
+            "• reply to any message with <code>/announce</code>\n\n"
+            f"Channel: <b>{ANNOUNCE_CHANNEL}</b>",
+            parse_mode="HTML",
+        )
+        return
+
+    try:
+        sent = context.bot.send_message(
+            chat_id=ANNOUNCE_CHANNEL,
+            text=text,
+            parse_mode=parse_mode,
+            disable_web_page_preview=False,
+        )
+        msg.reply_text(
+            f"✅ Posted to {ANNOUNCE_CHANNEL} (msg id {sent.message_id})"
+        )
+    except Exception as e:
+        # Retry without HTML parsing in case the text contains stray tags
+        try:
+            sent = context.bot.send_message(
+                chat_id=ANNOUNCE_CHANNEL,
+                text=text,
+            )
+            msg.reply_text(
+                f"✅ Posted to {ANNOUNCE_CHANNEL} as plain text (msg id {sent.message_id})"
+            )
+        except Exception as e2:
+            msg.reply_text(
+                f"❌ Failed to post to {ANNOUNCE_CHANNEL}: {e2}\n"
+                f"Make sure the bot is an admin in that channel."
+            )
+
+dp.add_handler(CommandHandler("announce", announce))
 
 # =========================================================
 # TAP RACE COMMANDS
