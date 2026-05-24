@@ -777,7 +777,7 @@ f"""
 
         answered = False
 
-        for remaining in range(total, 0, -3):
+        for remaining in range(total, 0, -1):
 
             if chat_id not in quiz_data:
                 answered = True
@@ -837,8 +837,8 @@ f"""
             except:
                 pass
 
-            # Sleep in 0.5s slices so we can exit fast when answered
-            for _ in range(6):
+            # Sleep 1s total, in 0.5s slices so we can exit fast when answered
+            for _ in range(2):
                 if chat_id not in quiz_data:
                     answered = True
                     break
@@ -1661,7 +1661,7 @@ def ask_quiz(
     for remaining in range(
         total,
         0,
-        -3
+        -1
     ):
 
         filled = int(
@@ -1719,8 +1719,8 @@ def ask_quiz(
         except:
             pass
 
-        # Sleep in 0.5s slices so we can exit fast when answered
-        for _ in range(6):
+        # Sleep 1s total, in 0.5s slices so we can exit fast when answered
+        for _ in range(2):
             if chat_id not in quiz_data:
                 return
             time.sleep(0.5)
