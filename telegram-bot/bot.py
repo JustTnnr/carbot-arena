@@ -3713,6 +3713,64 @@ def _write_live_state():
 threading.Thread(target=_write_live_state, daemon=True).start()
 
 # =========================================================
+# CONTROL POLLER (admin dashboard force-stop commands)
+# =========================================================
+
+CONTROL_FILE = "bot_control.json"
+
+def _apply_stop(kind):
+    global taprace_active, taprace_started, taprace_match, taprace_taps
+    global boss_raid, marathon_active, tournament_players
+
+    if kind == "giveaway":
+        events["giveaway"] = None
+        save_data()
+    elif kind == "premium":
+        events["premium"] = None
+        save_data()
+    elif kind == "tournament":
+        tournament_players.clear()
+        save_data()
+    elif kind == "boss_raid":
+        boss_raid = None
+    elif kind == "taprace":
+        taprace_active = False
+        taprace_started = False
+        taprace_match = []
+        taprace_taps = {}
+    elif kind == "marathon":
+        marathon_active = False
+    elif kind == "all":
+        events["giveaway"] = None
+        events["premium"] = None
+        tournament_players.clear()
+        boss_raid = None
+        taprace_active = False
+        taprace_started = False
+        taprace_match = []
+        taprace_taps = {}
+        marathon_active = False
+        save_data()
+
+def _poll_control():
+    while True:
+        try:
+            if os.path.exists(CONTROL_FILE):
+                with open(CONTROL_FILE, "r") as _f:
+                    cmds = json.load(_f)
+                # consume immediately
+                with open(CONTROL_FILE, "w") as _f:
+                    json.dump({"commands": []}, _f)
+                for cmd in cmds.get("commands", []):
+                    if cmd.get("action") == "stop":
+                        _apply_stop(cmd.get("type", ""))
+        except Exception:
+            pass
+        time.sleep(1)
+
+threading.Thread(target=_poll_control, daemon=True).start()
+
+# =========================================================
 # START BOT (with auto-reconnect)
 # =========================================================
 

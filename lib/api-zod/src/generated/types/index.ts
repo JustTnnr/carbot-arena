@@ -13,4 +13,7 @@ export * from './healthStatus';
 export * from './leaderboardEntry';
 export * from './liveState';
 export * from './liveStateTapRaceTaps';
+export * from './stopRequest';
+export * from './stopRequestType';
+export * from './stopResponse';
 export * from './tournamentData';

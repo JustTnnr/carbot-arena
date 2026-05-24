@@ -6,6 +6,17 @@ const router: IRouter = Router();
 
 const BOT_DATA_PATH = path.resolve(process.cwd(), "../../telegram-bot/bot_data.json");
 const BOT_LIVE_PATH = path.resolve(process.cwd(), "../../telegram-bot/bot_live.json");
+const BOT_CONTROL_PATH = path.resolve(process.cwd(), "../../telegram-bot/bot_control.json");
+
+const VALID_STOP_TYPES = new Set([
+  "giveaway",
+  "premium",
+  "tournament",
+  "boss_raid",
+  "taprace",
+  "marathon",
+  "all",
+]);
 
 function readBotData(): Record<string, unknown> {
   try {
@@ -125,6 +136,27 @@ router.get("/dashboard/live", (_req, res) => {
     botOnline,
     lastUpdated: (live.timestamp as number) ?? null,
   });
+});
+
+router.post("/dashboard/stop", (req, res) => {
+  const body = req.body as { type?: string } | undefined;
+  const type = body?.type;
+  if (!type || !VALID_STOP_TYPES.has(type)) {
+    res.status(400).json({ ok: false });
+    return;
+  }
+
+  let queue: { commands: Array<{ action: string; type: string }> } = { commands: [] };
+  try {
+    queue = JSON.parse(fs.readFileSync(BOT_CONTROL_PATH, "utf8"));
+    if (!Array.isArray(queue.commands)) queue.commands = [];
+  } catch {
+    queue = { commands: [] };
+  }
+  queue.commands.push({ action: "stop", type });
+  fs.writeFileSync(BOT_CONTROL_PATH, JSON.stringify(queue));
+
+  res.json({ ok: true });
 });
 
 export default router;

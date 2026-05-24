@@ -91,3 +91,15 @@ export const GetDashboardLiveResponse = zod.object({
 })
 
 
+/**
+ * @summary Force-stop a giveaway/event
+ */
+export const PostDashboardStopBody = zod.object({
+  "type": zod.enum(['giveaway', 'premium', 'tournament', 'boss_raid', 'taprace', 'marathon', 'all'])
+})
+
+export const PostDashboardStopResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+

@@ -45,6 +45,27 @@ export interface TournamentData {
   winners: string[];
 }
 
+export type StopRequestType = typeof StopRequestType[keyof typeof StopRequestType];
+
+
+export const StopRequestType = {
+  giveaway: 'giveaway',
+  premium: 'premium',
+  tournament: 'tournament',
+  boss_raid: 'boss_raid',
+  taprace: 'taprace',
+  marathon: 'marathon',
+  all: 'all',
+} as const;
+
+export interface StopRequest {
+  type: StopRequestType;
+}
+
+export interface StopResponse {
+  ok: boolean;
+}
+
 export type LiveStateTapRaceTaps = {[key: string]: number};
 
 export interface LiveState {

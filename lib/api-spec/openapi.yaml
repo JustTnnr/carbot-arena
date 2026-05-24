@@ -92,6 +92,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/LiveState"
 
+  /dashboard/stop:
+    post:
+      operationId: postDashboardStop
+      tags: [dashboard]
+      summary: Force-stop a giveaway/event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StopRequest"
+      responses:
+        "200":
+          description: Stop command queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StopResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -194,6 +213,23 @@ components:
         - playerCount
         - playerIds
         - winners
+
+    StopRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [giveaway, premium, tournament, boss_raid, taprace, marathon, all]
+      required:
+        - type
+
+    StopResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+      required:
+        - ok
 
     LiveState:
       type: object

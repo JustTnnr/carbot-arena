@@ -4,9 +4,11 @@ import {
   useGetDashboardLeaderboard, 
   useGetDashboardEvents, 
   useGetDashboardTournament, 
-  useGetDashboardLive 
+  useGetDashboardLive,
+  usePostDashboardStop,
+  type StopRequestType,
 } from "@workspace/api-client-react";
-import { Activity, Users, Trophy, Zap, Server, ShieldAlert, Crosshair, Goal, Sword, Timer, Play, CircleDot, Flag } from "lucide-react";
+import { Activity, Users, Trophy, Zap, Server, ShieldAlert, Crosshair, Goal, CircleDot, Flag, Octagon, Power } from "lucide-react";
 
 // Format numbers nicely
 const formatNumber = (num: number) => {
@@ -40,11 +42,42 @@ const Countdown = ({ endTime }: { endTime: number }) => {
 };
 
 export default function Dashboard() {
-  const { data: summary } = useGetDashboardSummary({ query: { refetchInterval: 5000 } });
-  const { data: leaderboard } = useGetDashboardLeaderboard({ query: { refetchInterval: 5000 } });
-  const { data: events } = useGetDashboardEvents({ query: { refetchInterval: 5000 } });
-  const { data: tournament } = useGetDashboardTournament({ query: { refetchInterval: 5000 } });
-  const { data: liveState } = useGetDashboardLive({ query: { refetchInterval: 5000 } });
+  const { data: summary } = useGetDashboardSummary({ query: { queryKey: ['dashboard-summary'], refetchInterval: 5000 } });
+  const { data: leaderboard } = useGetDashboardLeaderboard({ query: { queryKey: ['dashboard-leaderboard'], refetchInterval: 5000 } });
+  const { data: events } = useGetDashboardEvents({ query: { queryKey: ['dashboard-events'], refetchInterval: 5000 } });
+  const { data: tournament } = useGetDashboardTournament({ query: { queryKey: ['dashboard-tournament'], refetchInterval: 5000 } });
+  const { data: liveState } = useGetDashboardLive({ query: { queryKey: ['dashboard-live'], refetchInterval: 5000 } });
+
+  const stopMutation = usePostDashboardStop();
+  const [confirming, setConfirming] = useState<StopRequestType | null>(null);
+
+  const handleStop = (type: StopRequestType) => {
+    if (confirming !== type) {
+      setConfirming(type);
+      setTimeout(() => setConfirming((c) => (c === type ? null : c)), 3000);
+      return;
+    }
+    setConfirming(null);
+    stopMutation.mutate({ data: { type } });
+  };
+
+  const StopButton = ({ type, label }: { type: StopRequestType; label: string }) => {
+    const isArming = confirming === type;
+    return (
+      <button
+        onClick={() => handleStop(type)}
+        disabled={stopMutation.isPending}
+        className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-display font-bold uppercase tracking-widest border transition-colors disabled:opacity-50 ${
+          isArming
+            ? 'bg-destructive text-destructive-foreground border-destructive animate-pulse'
+            : 'bg-destructive/10 text-destructive border-destructive/40 hover:bg-destructive/20'
+        }`}
+      >
+        <Octagon className="w-3 h-3" />
+        {isArming ? 'Confirm?' : label}
+      </button>
+    );
+  };
 
   const botOnline = liveState?.botOnline ?? summary?.botOnline ?? false;
 
@@ -243,7 +276,10 @@ export default function Dashboard() {
                 
                 {/* Giveaway */}
                 <div className="p-3 border border-border bg-background">
-                  <div className="text-xs uppercase font-bold tracking-widest text-muted-foreground mb-1">Giveaway</div>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-xs uppercase font-bold tracking-widest text-muted-foreground">Giveaway</div>
+                    {events?.giveaway?.active && <StopButton type="giveaway" label="Stop" />}
+                  </div>
                   {events?.giveaway?.active ? (
                     <div>
                       <div className="font-display font-bold text-primary mb-1">{events.giveaway.title}</div>
@@ -264,7 +300,10 @@ export default function Dashboard() {
 
                 {/* Premium */}
                 <div className="p-3 border border-border bg-background">
-                  <div className="text-xs uppercase font-bold tracking-widest text-muted-foreground mb-1">Premium Event</div>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-xs uppercase font-bold tracking-widest text-muted-foreground">Premium Event</div>
+                    {events?.premium?.active && <StopButton type="premium" label="Stop" />}
+                  </div>
                   {events?.premium?.active ? (
                     <div>
                       <div className="font-display font-bold text-chart-5 mb-1">{events.premium.title}</div>
@@ -283,6 +322,26 @@ export default function Dashboard() {
                   )}
                 </div>
 
+              </div>
+
+              {/* Force Stop Controls */}
+              <div className="mt-5 pt-4 border-t border-border">
+                <div className="flex items-center gap-2 mb-3">
+                  <Power className="w-4 h-4 text-destructive" />
+                  <h3 className="text-xs uppercase font-bold tracking-widest text-muted-foreground">Force Stop Controls</h3>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <StopButton type="giveaway" label="Giveaway" />
+                  <StopButton type="premium" label="Premium" />
+                  <StopButton type="tournament" label="Tournament" />
+                  <StopButton type="boss_raid" label="Boss Raid" />
+                  <StopButton type="taprace" label="Tap Race" />
+                  <StopButton type="marathon" label="Marathon" />
+                  <StopButton type="all" label="Stop All" />
+                </div>
+                <div className="text-[10px] font-mono text-muted-foreground/60 mt-2 uppercase tracking-wider">
+                  Click twice to confirm. Bot applies within ~1 second.
+                </div>
               </div>
             </div>
 
