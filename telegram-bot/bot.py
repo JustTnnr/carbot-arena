@@ -764,7 +764,7 @@ f"""
 
         quiz_data[chat_id] = {
             "answer": q[1].lower(),
-            "end": now() + 35,
+            "end": now() + 20,
             "mix": True
         }
 
@@ -773,7 +773,7 @@ f"""
             "⏳ LOADING QUESTION..."
         )
 
-        total = 35
+        total = 20
 
         answered = False
 
@@ -1646,7 +1646,7 @@ def ask_quiz(
 
         "answer": q[1].lower(),
 
-        "end": now() + 30,
+        "end": now() + 20,
 
         "mix": False
 
@@ -1656,7 +1656,7 @@ def ask_quiz(
         "⏳ STARTING QUIZ..."
     )
 
-    total = 30
+    total = 20
 
     for remaining in range(
         total,
