@@ -15,7 +15,13 @@ type TgUser = {
 function readTelegramUser(): TgUser | null {
   try {
     const w = window as unknown as {
-      Telegram?: { WebApp?: { initDataUnsafe?: { user?: TgUser }; ready?: () => void; expand?: () => void } };
+      Telegram?: {
+        WebApp?: {
+          initDataUnsafe?: { user?: TgUser };
+          ready?: () => void;
+          expand?: () => void;
+        };
+      };
     };
     const wa = w.Telegram?.WebApp;
     if (wa?.ready) wa.ready();
@@ -27,6 +33,9 @@ function readTelegramUser(): TgUser | null {
 }
 
 const STORAGE_PREFIX = "carbot.play.tap.";
+const GRID_SIZE = 25;
+const MIN_GREEN_MS = 600;
+const MAX_GREEN_MS = 1100;
 
 function loadCreds(id: string): PlayerCreds | null {
   try {
@@ -45,47 +54,94 @@ function saveCreds(id: string, c: PlayerCreds) {
   }
 }
 
+function pickNextGreen(prev: number): number {
+  let next = Math.floor(Math.random() * GRID_SIZE);
+  if (next === prev) next = (next + 1) % GRID_SIZE;
+  return next;
+}
+
 export default function TapPage() {
   const [, params] = useRoute<{ id: string }>("/tap/:id");
   const id = params?.id ?? "";
-  const { state, error } = useSession(id, 700);
+  const { state, error, serverOffset } = useSession(id, 700);
   const [creds, setCreds] = useState<PlayerCreds | null>(() =>
     id ? loadCreds(id) : null,
   );
   const tgUser = useMemo(() => readTelegramUser(), []);
-  const defaultName =
-    tgUser?.username
-      ? `@${tgUser.username}`
-      : tgUser?.first_name
-        ? [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ")
-        : "";
+  const defaultName = tgUser?.username
+    ? `@${tgUser.username}`
+    : tgUser?.first_name
+      ? [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ")
+      : "";
   const [name, setName] = useState(defaultName);
   const [tgHandle, setTgHandle] = useState(tgUser?.username ?? "");
   const [joining, setJoining] = useState(false);
   const [joinErr, setJoinErr] = useState<string | null>(null);
   const [localScore, setLocalScore] = useState(0);
+  // Sync optimistic score with authoritative server score whenever the server
+  // reports a value (handles reconnect / mid-game rejoin).
+  const serverScore = useMemo(() => {
+    if (!creds || !state) return null;
+    return state.players.find((p) => p.playerId === creds.playerId)?.score ?? null;
+  }, [creds, state]);
+  useEffect(() => {
+    if (serverScore == null) return;
+    // Only adopt the server score if there are no pending un-flushed deltas.
+    if (pending.current === 0) setLocalScore(serverScore);
+  }, [serverScore]);
+  const [greenIdx, setGreenIdx] = useState<number>(-1);
+  // Debounce: ignore taps while a cell is mid-flip animation
+  const lastTapAt = useRef<Record<number, number>>({});
 
-  // Pending taps queue, flushed every ~150ms
+  // Pending signed delta queue, flushed periodically
   const pending = useRef(0);
   const flushing = useRef(false);
 
+  // Cycle the green cell while the game is running
+  useEffect(() => {
+    if (state?.status !== "running") {
+      setGreenIdx(-1);
+      return;
+    }
+    setGreenIdx((prev) => (prev < 0 ? Math.floor(Math.random() * GRID_SIZE) : prev));
+    const tick = () => {
+      setGreenIdx((prev) => pickNextGreen(prev));
+    };
+    const schedule = () => {
+      const wait = MIN_GREEN_MS + Math.random() * (MAX_GREEN_MS - MIN_GREEN_MS);
+      return setTimeout(() => {
+        tick();
+        timeoutId = schedule();
+      }, wait);
+    };
+    let timeoutId = schedule();
+    return () => clearTimeout(timeoutId);
+  }, [state?.status]);
+
+  // Flush pending deltas to the server in batches
   useEffect(() => {
     if (!creds || !id) return;
     const flush = async () => {
-      if (flushing.current || pending.current <= 0) return;
+      if (flushing.current || pending.current === 0) return;
       if (state?.status !== "running") return;
       flushing.current = true;
-      const amount = Math.min(25, pending.current);
-      pending.current -= amount;
-      try {
-        const r = await actSession(id, creds.playerId, creds.token, amount);
-        setLocalScore(r.score);
-      } catch {
-        /* drop */
+      // Clamp to [-25, 25] and avoid sending 0
+      const raw = pending.current;
+      const delta = Math.max(-25, Math.min(25, raw));
+      if (delta !== 0) {
+        pending.current = raw - delta;
+        try {
+          const r = await actSession(id, creds.playerId, creds.token, delta);
+          setLocalScore(r.score);
+        } catch {
+          /* drop */
+        }
+      } else {
+        pending.current = 0;
       }
       flushing.current = false;
     };
-    const t = setInterval(flush, 150);
+    const t = setInterval(flush, 200);
     return () => clearInterval(t);
   }, [creds, id, state?.status]);
 
@@ -111,14 +167,21 @@ export default function TapPage() {
     setJoining(false);
   };
 
-  const handleTap = () => {
+  const handleCellTap = (cellIdx: number) => {
     if (!creds || state?.status !== "running") return;
-    pending.current += 1;
-    setLocalScore((s) => s + 1);
+    // Per-cell debounce (anti double-fire)
+    const nowT = Date.now();
+    const last = lastTapAt.current[cellIdx] ?? 0;
+    if (nowT - last < 60) return;
+    lastTapAt.current[cellIdx] = nowT;
+
+    const isGreen = cellIdx === greenIdx;
+    pending.current += isGreen ? 1 : -1;
+    setLocalScore((s) => s + (isGreen ? 1 : -1));
   };
 
-  const startsIn = useCountdown(state?.startsAt ?? null);
-  const endsIn = useCountdown(state?.endsAt ?? null);
+  const startsIn = useCountdown(state?.startsAt ?? null, serverOffset);
+  const endsIn = useCountdown(state?.endsAt ?? null, serverOffset);
 
   if (error && !state) {
     return (
@@ -154,7 +217,8 @@ export default function TapPage() {
             <div className="text-5xl mb-2">⚡</div>
             <h1 className="text-2xl font-bold">Tap Race</h1>
             <p className="text-purple-200 text-sm mt-1">
-              Tap the button as fast as you can!
+              Tap only the GREEN square. Wrong cells and late taps cost you a
+              point.
             </p>
           </div>
           <div className="space-y-2">
@@ -204,6 +268,9 @@ export default function TapPage() {
   const ranked = state.players;
   const me = ranked.find((p) => p.playerId === creds.playerId);
   const myRank = me ? ranked.indexOf(me) + 1 : null;
+  const awaitingAdmin =
+    (state as { awaitingAdminStart?: boolean }).awaitingAdminStart === true;
+  const lobbyCountdown = Math.ceil(startsIn / 1000);
 
   return (
     <Shell>
@@ -214,44 +281,38 @@ export default function TapPage() {
           </div>
           <div className="text-3xl font-bold">
             {status === "lobby" &&
-              ((state as { awaitingAdminStart?: boolean }).awaitingAdminStart
+              (awaitingAdmin
                 ? "Waiting for admin…"
-                : `Starts in ${Math.ceil(startsIn / 1000)}s`)}
+                : `Starts in ${lobbyCountdown}s`)}
             {status === "running" && `${Math.ceil(endsIn / 1000)}s left`}
             {status === "finished" && "Race finished"}
           </div>
-          {status === "lobby" &&
-            (state as { awaitingAdminStart?: boolean }).awaitingAdminStart && (
-              <div className="text-sm text-purple-200 mt-1">
-                Admin must run /startrace in Telegram to begin.
-              </div>
-            )}
+          {status === "lobby" && awaitingAdmin && (
+            <div className="text-sm text-purple-200 mt-1">
+              Admin must run /startrace in Telegram to begin.
+            </div>
+          )}
+          {status === "running" && (
+            <div className="text-sm text-purple-200 mt-1">
+              Score: <span className="font-mono font-bold">{localScore}</span>
+            </div>
+          )}
         </div>
 
-        <button
-          onClick={handleTap}
-          disabled={status !== "running"}
-          className={`w-full aspect-square max-h-80 mx-auto rounded-3xl text-white text-3xl font-black border-4 transition select-none ${
-            status === "running"
-              ? "bg-gradient-to-br from-yellow-400 to-orange-500 border-yellow-200 active:scale-95 shadow-2xl"
-              : "bg-white/10 border-white/20 opacity-60"
-          }`}
-          style={{ touchAction: "manipulation" }}
-        >
-          {status === "lobby" && "GET READY"}
-          {status === "running" && (
-            <div>
-              <div>TAP!</div>
-              <div className="text-5xl mt-2">{localScore}</div>
+        <Grid
+          status={status}
+          greenIdx={greenIdx}
+          onTap={handleCellTap}
+        />
+
+        {status === "finished" && (
+          <div className="rounded-2xl bg-white/10 border border-white/20 p-4 text-center">
+            <div className="text-sm text-purple-200">You scored</div>
+            <div className="text-5xl font-black text-yellow-300 mt-1">
+              {me?.score ?? localScore}
             </div>
-          )}
-          {status === "finished" && (
-            <div>
-              <div className="text-lg">YOU SCORED</div>
-              <div className="text-6xl mt-2">{me?.score ?? localScore}</div>
-            </div>
-          )}
-        </button>
+          </div>
+        )}
 
         <Leaderboard
           players={ranked}
@@ -259,10 +320,54 @@ export default function TapPage() {
           myRank={myRank}
           winnerName={state.winnerName}
           status={status}
-          unit="taps"
+          unit="pts"
         />
       </div>
     </Shell>
+  );
+}
+
+function Grid({
+  status,
+  greenIdx,
+  onTap,
+}: {
+  status: "lobby" | "running" | "finished";
+  greenIdx: number;
+  onTap: (i: number) => void;
+}) {
+  const cells = Array.from({ length: GRID_SIZE }, (_, i) => i);
+  const running = status === "running";
+  return (
+    <div
+      className="grid grid-cols-5 gap-1 p-1 rounded-2xl bg-black border-2 border-black select-none"
+      style={{ aspectRatio: "1 / 1", touchAction: "manipulation" }}
+    >
+      {cells.map((i) => {
+        const isGreen = running && i === greenIdx;
+        const base = running
+          ? isGreen
+            ? "bg-emerald-400 border-emerald-200"
+            : "bg-red-600 border-red-900"
+          : status === "finished"
+            ? "bg-white/10 border-white/20"
+            : "bg-white/10 border-white/20";
+        return (
+          <button
+            key={i}
+            disabled={!running}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              onTap(i);
+            }}
+            className={`border-2 rounded-md transition-colors duration-75 active:scale-95 ${base} ${
+              !running ? "opacity-70" : ""
+            }`}
+            aria-label={`cell ${i + 1}`}
+          />
+        );
+      })}
+    </div>
   );
 }
 

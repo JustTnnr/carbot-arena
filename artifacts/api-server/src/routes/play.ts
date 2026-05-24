@@ -198,7 +198,7 @@ router.post("/play/session", (req: Request, res: Response) => {
   const lobby = Math.max(0, Math.min(120_000, body.lobbyDurationMs ?? 15_000));
   const play = Math.max(
     5_000,
-    Math.min(300_000, body.playDurationMs ?? (body.type === "tap" ? 20_000 : 60_000)),
+    Math.min(300_000, body.playDurationMs ?? (body.type === "tap" ? 30_000 : 60_000)),
   );
   const now = Date.now();
   const sessionId = newId(body.type === "tap" ? "tap" : "raid");
@@ -249,11 +249,36 @@ router.post("/play/session/:id/start", (req: Request, res: Response) => {
     res.json({ ok: true, alreadyRunning: true });
     return;
   }
+  // Idempotent: once a start has been scheduled (manualStart consumed), refuse
+  // to reschedule. Prevents a second /startrace from shifting the countdown.
+  if (s.manualStart === false && s.startsAt > Date.now() && s.startsAt < Date.now() + 365 * 24 * 60 * 60 * 1000 / 2) {
+    res.json({
+      ok: true,
+      alreadyScheduled: true,
+      startsAt: s.startsAt,
+      endsAt: s.endsAt,
+      serverTime: Date.now(),
+      players: s.players.size,
+    });
+    return;
+  }
+  const body = (req.body ?? {}) as { delayMs?: number };
+  const delay = Math.max(0, Math.min(60_000, Math.floor(body.delayMs ?? 0)));
   const now = Date.now();
-  s.status = "running";
-  s.startsAt = now;
-  s.endsAt = now + s.playDurationMs;
-  res.json({ ok: true, endsAt: s.endsAt, players: s.players.size });
+  // Schedule it — tickSession will transition lobby->running when startsAt arrives.
+  s.manualStart = false;
+  s.startsAt = now + delay;
+  s.endsAt = s.startsAt + s.playDurationMs;
+  if (delay === 0) {
+    s.status = "running";
+  }
+  res.json({
+    ok: true,
+    startsAt: s.startsAt,
+    endsAt: s.endsAt,
+    serverTime: now,
+    players: s.players.size,
+  });
 });
 
 router.get("/play/chat/:chatId/latest/:type", (req: Request, res: Response) => {
@@ -365,7 +390,7 @@ router.post("/play/session/:id/action", (req: Request, res: Response) => {
     return;
   }
   const rawAmount = Math.floor(body.amount ?? 0);
-  if (!Number.isFinite(rawAmount) || rawAmount < 1 || rawAmount > 25) {
+  if (!Number.isFinite(rawAmount) || rawAmount === 0 || rawAmount < -25 || rawAmount > 25) {
     res.status(400).json({ error: "invalid amount" });
     return;
   }
@@ -381,6 +406,11 @@ router.post("/play/session/:id/action", (req: Request, res: Response) => {
   if (s.type === "tap") {
     player.score += amount;
   } else {
+    // Boss raid: only positive damage allowed
+    if (amount < 1) {
+      res.json({ score: player.score, bossHp: s.bossHp ?? null });
+      return;
+    }
     const dmg = amount * 10; // each tap = 10 dmg
     const actual = Math.min(dmg, s.bossHp ?? 0);
     player.score += actual;

@@ -29,6 +29,7 @@ from telegram.error import (
 import random
 import threading
 import time
+import math
 import json
 import os
 import http.server
@@ -3581,7 +3582,7 @@ def webtap(update, context):
         body = _create_web_session({
             "type": "tap",
             "chatId": ANNOUNCE_CHANNEL,
-            "playDurationMs": 20000,
+            "playDurationMs": 30000,
             "manualStart": True,
         })
     except Exception as e:
@@ -3592,7 +3593,7 @@ def webtap(update, context):
         "⚡ <b>WEB TAP RACE</b> ⚡\n\n"
         "Click the link and enter your name to join the lobby.\n"
         "An admin will run /startrace when everyone's in.\n"
-        f"⏱ Race length: 20s\n\n"
+        f"⏱ Race length: 30s — hit the green square, avoid the reds!\n\n"
         f"🔗 <a href=\"{url}\">JOIN THE RACE</a>"
     )
     # Channels don't allow web_app buttons — use a plain URL button.
@@ -3624,11 +3625,12 @@ def _get_latest_session(chat_id, type_):
     with urllib.request.urlopen(req, timeout=10) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
-def _start_session(session_id):
+def _start_session(session_id, delay_ms=0):
     secret = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    payload = json.dumps({"delayMs": delay_ms}).encode("utf-8")
     req = urllib.request.Request(
         f"{_api_base()}/play/session/{session_id}/start",
-        data=b"",
+        data=payload,
         headers={
             "Content-Type": "application/json",
             "X-Bot-Secret": secret,
@@ -3667,6 +3669,24 @@ def startrace(update, context):
         update.message.reply_text("⚠️ The race is already running!")
         return
     player_count = latest.get("playerCount", 0)
+
+    # Schedule the start 10s in the future so the web page sees the same
+    # countdown as Telegram and they stay in lockstep.
+    try:
+        result = _start_session(session_id, delay_ms=10000)
+    except Exception as e:
+        update.message.reply_text(f"❌ Start failed: {e}")
+        return
+
+    starts_at_ms = result.get("startsAt")
+    server_time_ms = result.get("serverTime")
+    # Map server clock to local monotonic clock so each tick anchors against the
+    # real start moment instead of drifting with edit-latency.
+    if isinstance(starts_at_ms, (int, float)) and isinstance(server_time_ms, (int, float)):
+        local_start_at = time.time() + (starts_at_ms - server_time_ms) / 1000.0
+    else:
+        local_start_at = time.time() + 10.0
+
     update.message.reply_text(
         f"⏳ Starting in 10 seconds…\nPlayers in lobby: {player_count}"
     )
@@ -3682,8 +3702,13 @@ def startrace(update, context):
     except Exception:
         pass
 
-    for remaining in range(10, 0, -1):
-        if countdown_msg is not None:
+    last_shown = None
+    while True:
+        remaining_s = local_start_at - time.time()
+        remaining = int(math.ceil(remaining_s))
+        if remaining <= 0:
+            break
+        if remaining != last_shown and countdown_msg is not None:
             try:
                 context.bot.edit_message_text(
                     chat_id=ANNOUNCE_CHANNEL,
@@ -3696,19 +3721,16 @@ def startrace(update, context):
                 )
             except Exception:
                 pass
-        time.sleep(1)
-
-    try:
-        result = _start_session(session_id)
-    except Exception as e:
-        update.message.reply_text(f"❌ Start failed: {e}")
-        return
+            last_shown = remaining
+        # Sleep until the next second boundary against the real start time
+        next_tick = local_start_at - (remaining - 1)
+        time.sleep(max(0.05, min(1.0, next_tick - time.time())))
 
     players = result.get("players", player_count)
     started_text = (
         f"🏁 <b>RACE STARTED!</b>\n\n"
         f"👥 {players} player(s) in the lobby\n"
-        f"⏱ 20 seconds — tap your hearts out!"
+        f"⏱ 30 seconds — hit the green square!"
     )
     if countdown_msg is not None:
         try:
