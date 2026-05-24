@@ -945,7 +945,9 @@ f"""
     )
 
 def ping(update, context):
-    uptime_sec = int(time.time() - _HEALTH_START)
+    t_start = time.time()
+
+    uptime_sec = int(t_start - _HEALTH_START)
     days = uptime_sec // 86400
     hours = (uptime_sec % 86400) // 3600
     mins = (uptime_sec % 3600) // 60
@@ -960,11 +962,14 @@ def ping(update, context):
 
     border = random.choice(animated_borders)
 
+    ms = int((time.time() - t_start) * 1000)
+
     update.message.reply_text(
 f"""{border}
 🏓 PONG!
 {border}
 ✅ Bot is alive and running
+⚡ Response: {ms}ms
 ⏱ Uptime: {uptime_str}
 👥 Players tracked: {len(leaderboard)}
 {border}"""
