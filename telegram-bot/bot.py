@@ -3595,9 +3595,9 @@ def webtap(update, context):
         f"⏱ Race length: 20s\n\n"
         f"🔗 <a href=\"{url}\">JOIN THE RACE</a>"
     )
-    # WebApp button opens inside Telegram so we get the player's Telegram id/@username
+    # Channels don't allow web_app buttons — use a plain URL button.
     keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("⚡ JOIN TAP RACE", web_app=WebAppInfo(url=url))
+        InlineKeyboardButton("⚡ JOIN TAP RACE", url=url)
     ]])
     try:
         context.bot.send_message(

@@ -60,6 +60,7 @@ export default function TapPage() {
         ? [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ")
         : "";
   const [name, setName] = useState(defaultName);
+  const [tgHandle, setTgHandle] = useState(tgUser?.username ?? "");
   const [joining, setJoining] = useState(false);
   const [joinErr, setJoinErr] = useState<string | null>(null);
   const [localScore, setLocalScore] = useState(0);
@@ -94,9 +95,12 @@ export default function TapPage() {
     setJoining(true);
     setJoinErr(null);
     try {
+      const handle = (tgHandle || tgUser?.username || "")
+        .replace(/^@+/, "")
+        .trim();
       const r = await joinSession(id, trimmed, {
         telegramId: tgUser?.id,
-        telegramUsername: tgUser?.username,
+        telegramUsername: handle || undefined,
       });
       const next = { playerId: r.playerId, token: r.token, name: trimmed };
       saveCreds(id, next);
@@ -166,15 +170,20 @@ export default function TapPage() {
                 if (e.key === "Enter") void handleJoin();
               }}
             />
+            <label className="text-sm text-purple-200 block">
+              Telegram @username{" "}
+              <span className="text-purple-400 text-xs">(optional)</span>
+            </label>
+            <input
+              className="w-full rounded-xl bg-white/10 border border-white/20 text-white px-4 py-3 outline-none focus:border-yellow-300"
+              placeholder="@yourhandle"
+              value={tgHandle}
+              maxLength={32}
+              onChange={(e) => setTgHandle(e.target.value)}
+            />
             {tgUser && (
               <div className="text-xs text-purple-300">
-                Joining as Telegram user{" "}
-                {tgUser.username ? `@${tgUser.username}` : `#${tgUser.id}`}
-              </div>
-            )}
-            {!tgUser && (
-              <div className="text-xs text-yellow-300/80">
-                Tip: open this link from inside Telegram so the bot can recognise you automatically.
+                Detected as @{tgUser.username ?? `id${tgUser.id}`}
               </div>
             )}
             {joinErr && <div className="text-red-300 text-xs">{joinErr}</div>}
