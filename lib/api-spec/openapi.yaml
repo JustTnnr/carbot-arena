@@ -11,6 +11,8 @@ tags:
     description: Health operations
   - name: dashboard
     description: Bot admin dashboard
+  - name: play
+    description: Web-based mini-games (tap race, boss raid)
 paths:
   /healthz:
     get:
@@ -110,6 +112,96 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StopResponse"
+
+  /play/session:
+    post:
+      operationId: createPlaySession
+      tags: [play]
+      summary: Create a new web-game session (called by bot)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaySessionInput"
+      responses:
+        "200":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaySessionCreated"
+
+  /play/session/{id}:
+    get:
+      operationId: getPlaySession
+      tags: [play]
+      summary: Get current session state
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaySessionState"
+        "404":
+          description: Not found
+
+  /play/session/{id}/join:
+    post:
+      operationId: joinPlaySession
+      tags: [play]
+      summary: Register a player for the session
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlayJoinInput"
+      responses:
+        "200":
+          description: Joined
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayJoinResponse"
+
+  /play/session/{id}/action:
+    post:
+      operationId: actPlaySession
+      tags: [play]
+      summary: Submit a batch of taps / damage for a player
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlayActionInput"
+      responses:
+        "200":
+          description: Acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayActionResponse"
 
 components:
   schemas:
@@ -272,3 +364,133 @@ components:
         - marathonActive
         - botOnline
         - lastUpdated
+
+    PlaySessionInput:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [tap, raid]
+        chatId:
+          type: number
+        lobbyDurationMs:
+          type: integer
+        playDurationMs:
+          type: integer
+        bossHp:
+          type: integer
+      required:
+        - type
+        - chatId
+
+    PlaySessionCreated:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        url:
+          type: string
+      required:
+        - sessionId
+        - url
+
+    PlayPlayer:
+      type: object
+      properties:
+        playerId:
+          type: string
+        name:
+          type: string
+        score:
+          type: integer
+      required:
+        - playerId
+        - name
+        - score
+
+    PlaySessionState:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        type:
+          type: string
+          enum: [tap, raid]
+        status:
+          type: string
+          enum: [lobby, running, finished]
+        startsAt:
+          type: ["number", "null"]
+        endsAt:
+          type: ["number", "null"]
+        serverTime:
+          type: number
+        players:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlayPlayer"
+        bossHp:
+          type: ["integer", "null"]
+        bossMaxHp:
+          type: ["integer", "null"]
+        winnerName:
+          type: ["string", "null"]
+      required:
+        - sessionId
+        - type
+        - status
+        - startsAt
+        - endsAt
+        - serverTime
+        - players
+        - bossHp
+        - bossMaxHp
+        - winnerName
+
+    PlayJoinInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 32
+      required:
+        - name
+
+    PlayJoinResponse:
+      type: object
+      properties:
+        playerId:
+          type: string
+        token:
+          type: string
+      required:
+        - playerId
+        - token
+
+    PlayActionInput:
+      type: object
+      properties:
+        playerId:
+          type: string
+        token:
+          type: string
+        amount:
+          type: integer
+          minimum: 1
+          maximum: 25
+      required:
+        - playerId
+        - token
+        - amount
+
+    PlayActionResponse:
+      type: object
+      properties:
+        score:
+          type: integer
+        bossHp:
+          type: ["integer", "null"]
+      required:
+        - score
+        - bossHp

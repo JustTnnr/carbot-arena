@@ -32,6 +32,8 @@ import json
 import os
 import http.server
 import socketserver
+import urllib.request
+import urllib.error
 
 # =========================================================
 # HEALTH SERVER — starts immediately so port opens fast
@@ -3538,6 +3540,91 @@ dp.add_handler(
         carlogo
     )
 )
+
+# =========================================================
+# WEB GAME COMMANDS (browser-based tap race + raid)
+# =========================================================
+
+def _api_base():
+    return os.environ.get("PLAY_API_BASE", "http://localhost:80/api")
+
+def _create_web_session(payload):
+    data = json.dumps(payload).encode("utf-8")
+    secret = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    req = urllib.request.Request(
+        f"{_api_base()}/play/session",
+        data=data,
+        headers={
+            "Content-Type": "application/json",
+            "X-Bot-Secret": secret,
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+def webtap(update, context):
+    if not is_admin(update):
+        return
+    chat_id = update.effective_chat.id
+    try:
+        body = _create_web_session({
+            "type": "tap",
+            "chatId": chat_id,
+            "lobbyDurationMs": 15000,
+            "playDurationMs": 20000,
+        })
+    except Exception as e:
+        update.message.reply_text(f"❌ Could not create session: {e}")
+        return
+    url = body.get("url", "")
+    text = (
+        "⚡ <b>WEB TAP RACE</b> ⚡\n\n"
+        "Click the link, enter your name, and tap as fast as you can!\n"
+        f"⏱ Lobby: 15s • Race: 20s\n\n"
+        f"🔗 <a href=\"{url}\">JOIN THE RACE</a>"
+    )
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("⚡ JOIN TAP RACE", url=url)
+    ]])
+    context.bot.send_message(
+        chat_id, text, parse_mode="HTML",
+        reply_markup=keyboard, disable_web_page_preview=True,
+    )
+
+def webraid(update, context):
+    if not is_admin(update):
+        return
+    chat_id = update.effective_chat.id
+    try:
+        body = _create_web_session({
+            "type": "raid",
+            "chatId": chat_id,
+            "lobbyDurationMs": 10000,
+            "playDurationMs": 60000,
+            "bossHp": 50000,
+        })
+    except Exception as e:
+        update.message.reply_text(f"❌ Could not create session: {e}")
+        return
+    url = body.get("url", "")
+    text = (
+        "👹 <b>WEB BOSS RAID</b> 👹\n\n"
+        "Boss HP: 50,000\n"
+        "Tap to deal 10 damage each hit. Kill the boss before time runs out!\n"
+        f"⏱ Lobby: 10s • Raid: 60s\n\n"
+        f"🔗 <a href=\"{url}\">JOIN THE RAID</a>"
+    )
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("⚔️ JOIN BOSS RAID", url=url)
+    ]])
+    context.bot.send_message(
+        chat_id, text, parse_mode="HTML",
+        reply_markup=keyboard, disable_web_page_preview=True,
+    )
+
+dp.add_handler(CommandHandler("webtap", webtap))
+dp.add_handler(CommandHandler("webraid", webraid))
 
 # =========================================================
 # TAP RACE COMMANDS

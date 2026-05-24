@@ -103,3 +103,89 @@ export const PostDashboardStopResponse = zod.object({
 })
 
 
+/**
+ * @summary Create a new web-game session (called by bot)
+ */
+export const CreatePlaySessionBody = zod.object({
+  "type": zod.enum(['tap', 'raid']),
+  "chatId": zod.number(),
+  "lobbyDurationMs": zod.number().optional(),
+  "playDurationMs": zod.number().optional(),
+  "bossHp": zod.number().optional()
+})
+
+export const CreatePlaySessionResponse = zod.object({
+  "sessionId": zod.string(),
+  "url": zod.string()
+})
+
+
+/**
+ * @summary Get current session state
+ */
+export const GetPlaySessionParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetPlaySessionResponse = zod.object({
+  "sessionId": zod.string(),
+  "type": zod.enum(['tap', 'raid']),
+  "status": zod.enum(['lobby', 'running', 'finished']),
+  "startsAt": zod.number().nullable(),
+  "endsAt": zod.number().nullable(),
+  "serverTime": zod.number(),
+  "players": zod.array(zod.object({
+  "playerId": zod.string(),
+  "name": zod.string(),
+  "score": zod.number()
+})),
+  "bossHp": zod.number().nullable(),
+  "bossMaxHp": zod.number().nullable(),
+  "winnerName": zod.string().nullable()
+})
+
+
+/**
+ * @summary Register a player for the session
+ */
+export const JoinPlaySessionParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const joinPlaySessionBodyNameMax = 32;
+
+
+
+export const JoinPlaySessionBody = zod.object({
+  "name": zod.string().min(1).max(joinPlaySessionBodyNameMax)
+})
+
+export const JoinPlaySessionResponse = zod.object({
+  "playerId": zod.string(),
+  "token": zod.string()
+})
+
+
+/**
+ * @summary Submit a batch of taps / damage for a player
+ */
+export const ActPlaySessionParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const actPlaySessionBodyAmountMax = 25;
+
+
+
+export const ActPlaySessionBody = zod.object({
+  "playerId": zod.string(),
+  "token": zod.string(),
+  "amount": zod.number().min(1).max(actPlaySessionBodyAmountMax)
+})
+
+export const ActPlaySessionResponse = zod.object({
+  "score": zod.number(),
+  "bossHp": zod.number().nullable()
+})
+
+

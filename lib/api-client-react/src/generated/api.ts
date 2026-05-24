@@ -25,6 +25,13 @@ import type {
   HealthStatus,
   LeaderboardEntry,
   LiveState,
+  PlayActionInput,
+  PlayActionResponse,
+  PlayJoinInput,
+  PlayJoinResponse,
+  PlaySessionCreated,
+  PlaySessionInput,
+  PlaySessionState,
   StopRequest,
   StopResponse,
   TournamentData
@@ -573,5 +580,297 @@ export const usePostDashboardStop = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getPostDashboardStopMutationOptions(options));
+    }
+
+export const getCreatePlaySessionUrl = () => {
+
+
+
+
+  return `/api/play/session`
+}
+
+/**
+ * @summary Create a new web-game session (called by bot)
+ */
+export const createPlaySession = async (playSessionInput: PlaySessionInput, options?: RequestInit): Promise<PlaySessionCreated> => {
+
+  return customFetch<PlaySessionCreated>(getCreatePlaySessionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      playSessionInput,)
+  }
+);}
+
+
+
+
+export const getCreatePlaySessionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPlaySession>>, TError,{data: BodyType<PlaySessionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPlaySession>>, TError,{data: BodyType<PlaySessionInput>}, TContext> => {
+
+const mutationKey = ['createPlaySession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPlaySession>>, {data: BodyType<PlaySessionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPlaySession(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePlaySessionMutationResult = NonNullable<Awaited<ReturnType<typeof createPlaySession>>>
+    export type CreatePlaySessionMutationBody = BodyType<PlaySessionInput>
+    export type CreatePlaySessionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a new web-game session (called by bot)
+ */
+export const useCreatePlaySession = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPlaySession>>, TError,{data: BodyType<PlaySessionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPlaySession>>,
+        TError,
+        {data: BodyType<PlaySessionInput>},
+        TContext
+      > => {
+      return useMutation(getCreatePlaySessionMutationOptions(options));
+    }
+
+export const getGetPlaySessionUrl = (id: string,) => {
+
+
+
+
+  return `/api/play/session/${id}`
+}
+
+/**
+ * @summary Get current session state
+ */
+export const getPlaySession = async (id: string, options?: RequestInit): Promise<PlaySessionState> => {
+
+  return customFetch<PlaySessionState>(getGetPlaySessionUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPlaySessionQueryKey = (id: string,) => {
+    return [
+    `/api/play/session/${id}`
+    ] as const;
+    }
+
+
+export const getGetPlaySessionQueryOptions = <TData = Awaited<ReturnType<typeof getPlaySession>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPlaySession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPlaySessionQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlaySession>>> = ({ signal }) => getPlaySession(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPlaySession>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPlaySessionQueryResult = NonNullable<Awaited<ReturnType<typeof getPlaySession>>>
+export type GetPlaySessionQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get current session state
+ */
+
+export function useGetPlaySession<TData = Awaited<ReturnType<typeof getPlaySession>>, TError = ErrorType<void>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPlaySession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPlaySessionQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getJoinPlaySessionUrl = (id: string,) => {
+
+
+
+
+  return `/api/play/session/${id}/join`
+}
+
+/**
+ * @summary Register a player for the session
+ */
+export const joinPlaySession = async (id: string,
+    playJoinInput: PlayJoinInput, options?: RequestInit): Promise<PlayJoinResponse> => {
+
+  return customFetch<PlayJoinResponse>(getJoinPlaySessionUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      playJoinInput,)
+  }
+);}
+
+
+
+
+export const getJoinPlaySessionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinPlaySession>>, TError,{id: string;data: BodyType<PlayJoinInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof joinPlaySession>>, TError,{id: string;data: BodyType<PlayJoinInput>}, TContext> => {
+
+const mutationKey = ['joinPlaySession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof joinPlaySession>>, {id: string;data: BodyType<PlayJoinInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  joinPlaySession(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type JoinPlaySessionMutationResult = NonNullable<Awaited<ReturnType<typeof joinPlaySession>>>
+    export type JoinPlaySessionMutationBody = BodyType<PlayJoinInput>
+    export type JoinPlaySessionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Register a player for the session
+ */
+export const useJoinPlaySession = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinPlaySession>>, TError,{id: string;data: BodyType<PlayJoinInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof joinPlaySession>>,
+        TError,
+        {id: string;data: BodyType<PlayJoinInput>},
+        TContext
+      > => {
+      return useMutation(getJoinPlaySessionMutationOptions(options));
+    }
+
+export const getActPlaySessionUrl = (id: string,) => {
+
+
+
+
+  return `/api/play/session/${id}/action`
+}
+
+/**
+ * @summary Submit a batch of taps / damage for a player
+ */
+export const actPlaySession = async (id: string,
+    playActionInput: PlayActionInput, options?: RequestInit): Promise<PlayActionResponse> => {
+
+  return customFetch<PlayActionResponse>(getActPlaySessionUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      playActionInput,)
+  }
+);}
+
+
+
+
+export const getActPlaySessionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof actPlaySession>>, TError,{id: string;data: BodyType<PlayActionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof actPlaySession>>, TError,{id: string;data: BodyType<PlayActionInput>}, TContext> => {
+
+const mutationKey = ['actPlaySession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof actPlaySession>>, {id: string;data: BodyType<PlayActionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  actPlaySession(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ActPlaySessionMutationResult = NonNullable<Awaited<ReturnType<typeof actPlaySession>>>
+    export type ActPlaySessionMutationBody = BodyType<PlayActionInput>
+    export type ActPlaySessionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Submit a batch of taps / damage for a player
+ */
+export const useActPlaySession = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof actPlaySession>>, TError,{id: string;data: BodyType<PlayActionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof actPlaySession>>,
+        TError,
+        {id: string;data: BodyType<PlayActionInput>},
+        TContext
+      > => {
+      return useMutation(getActPlaySessionMutationOptions(options));
     }
 

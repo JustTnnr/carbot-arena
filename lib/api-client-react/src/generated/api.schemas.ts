@@ -83,3 +83,94 @@ export interface LiveState {
   lastUpdated: number | null;
 }
 
+export type PlaySessionInputType = typeof PlaySessionInputType[keyof typeof PlaySessionInputType];
+
+
+export const PlaySessionInputType = {
+  tap: 'tap',
+  raid: 'raid',
+} as const;
+
+export interface PlaySessionInput {
+  type: PlaySessionInputType;
+  chatId: number;
+  lobbyDurationMs?: number;
+  playDurationMs?: number;
+  bossHp?: number;
+}
+
+export interface PlaySessionCreated {
+  sessionId: string;
+  url: string;
+}
+
+export interface PlayPlayer {
+  playerId: string;
+  name: string;
+  score: number;
+}
+
+export type PlaySessionStateType = typeof PlaySessionStateType[keyof typeof PlaySessionStateType];
+
+
+export const PlaySessionStateType = {
+  tap: 'tap',
+  raid: 'raid',
+} as const;
+
+export type PlaySessionStateStatus = typeof PlaySessionStateStatus[keyof typeof PlaySessionStateStatus];
+
+
+export const PlaySessionStateStatus = {
+  lobby: 'lobby',
+  running: 'running',
+  finished: 'finished',
+} as const;
+
+export interface PlaySessionState {
+  sessionId: string;
+  type: PlaySessionStateType;
+  status: PlaySessionStateStatus;
+  /** @nullable */
+  startsAt: number | null;
+  /** @nullable */
+  endsAt: number | null;
+  serverTime: number;
+  players: PlayPlayer[];
+  /** @nullable */
+  bossHp: number | null;
+  /** @nullable */
+  bossMaxHp: number | null;
+  /** @nullable */
+  winnerName: string | null;
+}
+
+export interface PlayJoinInput {
+  /**
+     * @minLength 1
+     * @maxLength 32
+     */
+  name: string;
+}
+
+export interface PlayJoinResponse {
+  playerId: string;
+  token: string;
+}
+
+export interface PlayActionInput {
+  playerId: string;
+  token: string;
+  /**
+     * @minimum 1
+     * @maximum 25
+     */
+  amount: number;
+}
+
+export interface PlayActionResponse {
+  score: number;
+  /** @nullable */
+  bossHp: number | null;
+}
+

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/play/"
+title = "CarBot Arena"
+version = "1.0.0"
+id = "artifacts/play"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/play/" ]
+localPort = 21244
+
+[services.development]
+run = "pnpm --filter @workspace/play run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/play", "run", "build" ]
+publicDir = "artifacts/play/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21244"
+BASE_PATH = "/play/"
