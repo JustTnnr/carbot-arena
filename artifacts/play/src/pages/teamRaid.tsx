@@ -145,7 +145,6 @@ export default function TeamRaidPage() {
   };
 
   const startsIn = useCountdown(state?.startsAt ?? null, serverOffset);
-  const endsIn = useCountdown(state?.endsAt ?? null, serverOffset);
 
   if (error && !state) {
     return <Shell><div className="text-center text-red-300">Session unavailable. {error}</div></Shell>;
@@ -245,15 +244,18 @@ export default function TeamRaidPage() {
     );
   }
 
-  // ── Lobby ────────────────────────────────────────────────────────────────────
+  // ── Lobby (short or zero-duration — mostly unseen) ────────────────────────
   if (state.status === "lobby") {
+    const lobbyMs = startsIn;
     return (
       <Shell>
         <div className="text-center space-y-4">
           <div className="text-6xl">👹</div>
           <h1 className="text-2xl font-bold">Team Boss Raid</h1>
-          <div className="text-4xl font-black text-rose-300">{Math.ceil(startsIn / 1000)}s</div>
-          <div className="text-rose-300 text-sm">Raid starts soon — get your team ready!</div>
+          {lobbyMs > 500 && (
+            <div className="text-4xl font-black text-rose-300">{Math.ceil(lobbyMs / 1000)}s</div>
+          )}
+          <div className="text-rose-300 text-sm">Loading raid…</div>
           {myTeam && (
             <div className={`rounded-2xl bg-gradient-to-br ${teamColor(myTeamIdx ?? 0)} p-4 border border-white/20`}>
               <div className="text-sm opacity-80">Your team</div>
@@ -261,16 +263,6 @@ export default function TeamRaidPage() {
               <div className="text-sm opacity-80">{myTeam.memberCount}/3 members</div>
             </div>
           )}
-          <div className="rounded-2xl bg-white/10 border border-white/20 p-3">
-            <div className="text-sm text-rose-300 mb-1">All teams</div>
-            <div className="grid grid-cols-4 gap-1 text-xs">
-              {state.teams.map((t) => (
-                <div key={t.teamIdx} className={`rounded-lg py-1 px-2 ${t.teamIdx === myTeamIdx ? "bg-white/30 font-bold" : "bg-white/10"}`}>
-                  {t.name} {t.memberCount}/3
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </Shell>
     );
@@ -333,7 +325,7 @@ export default function TeamRaidPage() {
           <div className="text-sm text-rose-300">
             {myTeam ? <span className="font-bold">{myTeam.name}</span> : "Team Raid"}
           </div>
-          <div className="text-sm font-mono text-rose-300">{Math.ceil(endsIn / 1000)}s left</div>
+          <div className="text-sm font-mono text-rose-300">No time limit</div>
         </div>
 
         {/* Boss HP */}

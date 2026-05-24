@@ -312,6 +312,8 @@ function tickSession(s: Session): void {
           s.questionStartedAt = now;
         }
       }
+    } else if (s.type === "team-raid") {
+      // No time limit for team-raid — ends only when boss is killed
     } else if (now >= s.endsAt) {
       finishSession(s, "time");
     }
@@ -512,6 +514,7 @@ router.post("/play/session/:id/join", (req: Request, res: Response) => {
     res.status(409).json({ error: "quiz already started" });
     return;
   }
+  // Team-raid: allow joining at any time (no lobby cutoff)
 
   const body = req.body as {
     name?: string;
@@ -675,10 +678,10 @@ router.post("/play/session/:id/action", (req: Request, res: Response) => {
       s.bossHp = 0;
       finishSession(s, "boss_killed");
     }
-    // Team-raid: no boss kill — time runs out
+    // Team-raid: boss kill ends the game
     if (s.type === "team-raid" && (s.bossHp ?? 0) <= 0) {
       s.bossHp = 0;
-      // Don't finish early — let time run out so teams keep competing
+      finishSession(s, "boss_killed");
     }
   }
 

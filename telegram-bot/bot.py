@@ -3772,9 +3772,9 @@ def webraid(update, context):
         body = _create_web_session({
             "type": "team-raid",
             "chatId": ANNOUNCE_CHANNEL,
-            "lobbyDurationMs": 30000,
-            "playDurationMs": 60000,
-            "bossHp": 50000,
+            "lobbyDurationMs": 0,
+            "playDurationMs": 86400000,
+            "bossHp": 30000,
         })
     except Exception as e:
         update.message.reply_text(f"❌ Could not create session: {e}")
@@ -3783,11 +3783,12 @@ def webraid(update, context):
     text = (
         "👹 <b>WEB TEAM BOSS RAID</b> 👹\n\n"
         "<b>12 teams</b> (3 players max each) vs. the Boss!\n"
-        "Pick your team, deal the most damage as a team, and win!\n\n"
-        "<b>Scoring</b>\n"
+        "Pick your team, deal the most damage, and slay the boss!\n\n"
+        "<b>Rules</b>\n"
         "⚔️ Every tap = 10 damage\n"
-        "🏆 The team with the MOST damage when time runs out wins!\n\n"
-        f"⏱ Lobby: 30s • Raid: 60s • Boss HP: 50,000\n\n"
+        "💀 First team combo to kill the boss wins!\n"
+        "🏆 Most team damage when boss dies = winning team!\n\n"
+        f"❤️ Boss HP: 30,000 • Join anytime!\n\n"
         f"🔗 <a href=\"{url}\">JOIN TEAM RAID</a>"
     )
     keyboard = InlineKeyboardMarkup([[
