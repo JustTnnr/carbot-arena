@@ -16,7 +16,14 @@ from telegram.ext import (
     Filters,
 )
 
-from telegram.error import BadRequest
+from telegram.error import (
+    BadRequest,
+    NetworkError,
+    TimedOut,
+    RetryAfter,
+    Unauthorized,
+    TelegramError,
+)
 
 import random
 import threading
@@ -3594,18 +3601,65 @@ threading.Thread(
 ).start()
 
 # =========================================================
-# START BOT
+# ERROR HANDLER
 # =========================================================
 
-updater.start_polling(
-    timeout=10,
-    read_latency=2
-)
+def error_handler(update, context):
+    err = context.error
+    if isinstance(err, (TimedOut, NetworkError)):
+        print(f"[RECONNECT] Network issue: {err} — will auto-retry")
+    elif isinstance(err, RetryAfter):
+        print(f"[RATELIMIT] Flood control: retry after {err.retry_after}s")
+    elif isinstance(err, Unauthorized):
+        print("[AUTH] Bot token revoked or invalid — check TELEGRAM_BOT_TOKEN")
+    elif isinstance(err, BadRequest):
+        print(f"[BADREQ] {err}")
+    else:
+        print(f"[ERROR] {err}")
 
-print("""
+dp.add_error_handler(error_handler)
+
+# =========================================================
+# START BOT (with auto-reconnect)
+# =========================================================
+
+_RECONNECT_DELAY = 5
+
+while True:
+    try:
+        updater.start_polling(
+            timeout=10,
+            read_latency=2,
+            drop_pending_updates=False,
+        )
+        print("""
 ______________
 🔥 BOT RUNNING 🔥
 ______________
 """)
+        updater.idle()
+        break
 
-updater.idle()
+    except (NetworkError, TimedOut) as e:
+        print(f"[RECONNECT] Lost connection: {e} — retrying in {_RECONNECT_DELAY}s")
+        time.sleep(_RECONNECT_DELAY)
+        try:
+            updater.stop()
+        except Exception:
+            pass
+
+    except RetryAfter as e:
+        print(f"[RATELIMIT] Flood control hit — waiting {e.retry_after}s")
+        time.sleep(e.retry_after)
+
+    except Unauthorized:
+        print("[AUTH] Invalid token — stopping. Check TELEGRAM_BOT_TOKEN secret.")
+        break
+
+    except Exception as e:
+        print(f"[ERROR] Unexpected error: {e} — retrying in {_RECONNECT_DELAY}s")
+        time.sleep(_RECONNECT_DELAY)
+        try:
+            updater.stop()
+        except Exception:
+            pass
