@@ -6,7 +6,7 @@ export type PlayPlayer = {
 
 export type PlaySessionState = {
   sessionId: string;
-  type: "tap" | "raid";
+  type: "tap" | "raid" | "quiz" | "team-raid";
   status: "lobby" | "running" | "finished";
   startsAt: number | null;
   endsAt: number | null;
@@ -15,10 +15,26 @@ export type PlaySessionState = {
   bossHp: number | null;
   bossMaxHp: number | null;
   winnerName: string | null;
+  // tap/raid extras
+  awaitingAdminStart?: boolean;
+  manualStart?: boolean;
+  // quiz extras (optional — full typing handled in quiz.tsx)
+  quizType?: string;
+  currentQ?: number;
+  totalQuestions?: number;
+  questionEndsAt?: number;
+  revealEndsAt?: number;
+  questionDurationMs?: number;
+  question?: { text: string; options: string[]; correctIdx?: number } | null;
+  myAnswer?: number | null;
+  // team-raid extras
+  teams?: { teamIdx: number; name: string; totalDamage: number; memberCount: number; full: boolean }[];
+  myTeamIdx?: number | null;
+  winnerTeamIdx?: number | null;
 };
 
-export type JoinResponse = { playerId: string; token: string };
-export type ActionResponse = { score: number; bossHp: number | null };
+export type JoinResponse = { playerId: string; token: string; teamIdx?: number; teamName?: string };
+export type ActionResponse = { score: number; bossHp: number | null; accepted?: boolean; correct?: boolean };
 
 const API = "/api";
 

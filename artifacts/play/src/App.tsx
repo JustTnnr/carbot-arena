@@ -3,6 +3,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Home from "@/pages/home";
 import TapPage from "@/pages/tap";
 import RaidPage from "@/pages/raid";
+import QuizPage from "@/pages/quiz";
+import TeamRaidPage from "@/pages/teamRaid";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -13,6 +15,8 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/tap/:id" component={TapPage} />
       <Route path="/raid/:id" component={RaidPage} />
+      <Route path="/quiz/:id" component={QuizPage} />
+      <Route path="/team-raid/:id" component={TeamRaidPage} />
       <Route component={NotFound} />
     </Switch>
   );

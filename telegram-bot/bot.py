@@ -3770,9 +3770,9 @@ def webraid(update, context):
     chat_id = update.effective_chat.id
     try:
         body = _create_web_session({
-            "type": "raid",
-            "chatId": chat_id,
-            "lobbyDurationMs": 10000,
+            "type": "team-raid",
+            "chatId": ANNOUNCE_CHANNEL,
+            "lobbyDurationMs": 30000,
             "playDurationMs": 60000,
             "bossHp": 50000,
         })
@@ -3781,23 +3781,83 @@ def webraid(update, context):
         return
     url = body.get("url", "")
     text = (
-        "👹 <b>WEB BOSS RAID</b> 👹\n\n"
-        "Boss HP: 50,000\n"
-        "Tap to deal 10 damage each hit. Kill the boss before time runs out!\n"
-        f"⏱ Lobby: 10s • Raid: 60s\n\n"
-        f"🔗 <a href=\"{url}\">JOIN THE RAID</a>"
+        "👹 <b>WEB TEAM BOSS RAID</b> 👹\n\n"
+        "<b>12 teams</b> (3 players max each) vs. the Boss!\n"
+        "Pick your team, deal the most damage as a team, and win!\n\n"
+        "<b>Scoring</b>\n"
+        "⚔️ Every tap = 10 damage\n"
+        "🏆 The team with the MOST damage when time runs out wins!\n\n"
+        f"⏱ Lobby: 30s • Raid: 60s • Boss HP: 50,000\n\n"
+        f"🔗 <a href=\"{url}\">JOIN TEAM RAID</a>"
     )
     keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("⚔️ JOIN BOSS RAID", url=url)
+        InlineKeyboardButton("⚔️ JOIN TEAM RAID", url=url)
     ]])
-    context.bot.send_message(
-        chat_id, text, parse_mode="HTML",
-        reply_markup=keyboard, disable_web_page_preview=True,
+    try:
+        context.bot.send_message(
+            ANNOUNCE_CHANNEL, text, parse_mode="HTML",
+            reply_markup=keyboard, disable_web_page_preview=True,
+        )
+        update.message.reply_text(f"✅ Team Raid posted to {ANNOUNCE_CHANNEL}.")
+    except Exception as e:
+        update.message.reply_text(f"❌ Couldn't post: {e}")
+
+def _post_web_quiz(update, context, quiz_type, label, emoji):
+    if not is_admin(update):
+        return
+    try:
+        body = _create_web_session({
+            "type": "quiz",
+            "quizType": quiz_type,
+            "chatId": ANNOUNCE_CHANNEL,
+            "lobbyDurationMs": 30000,
+        })
+    except Exception as e:
+        update.message.reply_text(f"❌ Could not create session: {e}")
+        return
+    url = body.get("url", "")
+    text = (
+        f"{emoji} <b>WEB {label.upper()}</b> {emoji}\n\n"
+        f"10 questions • 15 seconds each\n"
+        f"Answer fast for more points — fastest correct answer wins!\n\n"
+        f"⏱ Lobby: 30s — join now before the quiz starts!\n\n"
+        f"🔗 <a href=\"{url}\">JOIN {label.upper()}</a>"
     )
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton(f"{emoji} JOIN {label.upper()}", url=url)
+    ]])
+    try:
+        context.bot.send_message(
+            ANNOUNCE_CHANNEL, text, parse_mode="HTML",
+            reply_markup=keyboard, disable_web_page_preview=True,
+        )
+        update.message.reply_text(f"✅ {label} posted to {ANNOUNCE_CHANNEL}.")
+    except Exception as e:
+        update.message.reply_text(f"❌ Couldn't post: {e}")
+
+def webcarquiz(update, context):
+    _post_web_quiz(update, context, "carquiz", "Car Quiz", "🚗")
+
+def webmathquiz(update, context):
+    _post_web_quiz(update, context, "mathquiz", "Math Quiz", "🧠")
+
+def webpuzzle(update, context):
+    _post_web_quiz(update, context, "puzzle", "Puzzle Quiz", "🧩")
+
+def webcarlogo(update, context):
+    _post_web_quiz(update, context, "carlogo", "Car Logo Quiz", "🚘")
+
+def webmixquiz(update, context):
+    _post_web_quiz(update, context, "mixquiz", "Mix Quiz", "🎲")
 
 dp.add_handler(CommandHandler("webtap", webtap))
 dp.add_handler(CommandHandler("webraid", webraid))
 dp.add_handler(CommandHandler("startrace", startrace))
+dp.add_handler(CommandHandler("webcarquiz", webcarquiz))
+dp.add_handler(CommandHandler("webmathquiz", webmathquiz))
+dp.add_handler(CommandHandler("webpuzzle", webpuzzle))
+dp.add_handler(CommandHandler("webcarlogo", webcarlogo))
+dp.add_handler(CommandHandler("webmixquiz", webmixquiz))
 
 # =========================================================
 # ANNOUNCEMENT CHANNEL
