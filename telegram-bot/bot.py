@@ -3598,8 +3598,8 @@ threading.Thread(
 # =========================================================
 
 updater.start_polling(
-    timeout=30,
-    read_latency=10
+    timeout=10,
+    read_latency=2
 )
 
 print("""
