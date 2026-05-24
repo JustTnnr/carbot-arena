@@ -3576,11 +3576,10 @@ def _create_web_session(payload):
 def webtap(update, context):
     if not is_admin(update):
         return
-    chat_id = update.effective_chat.id
     try:
         body = _create_web_session({
             "type": "tap",
-            "chatId": chat_id,
+            "chatId": ANNOUNCE_CHANNEL,
             "playDurationMs": 20000,
             "manualStart": True,
         })
@@ -3598,10 +3597,20 @@ def webtap(update, context):
     keyboard = InlineKeyboardMarkup([[
         InlineKeyboardButton("⚡ JOIN TAP RACE", url=url)
     ]])
-    context.bot.send_message(
-        chat_id, text, parse_mode="HTML",
-        reply_markup=keyboard, disable_web_page_preview=True,
-    )
+    try:
+        context.bot.send_message(
+            ANNOUNCE_CHANNEL, text, parse_mode="HTML",
+            reply_markup=keyboard, disable_web_page_preview=True,
+        )
+        update.message.reply_text(
+            f"✅ Tap race posted to {ANNOUNCE_CHANNEL}.\n"
+            f"Run /startrace here when you're ready to begin."
+        )
+    except Exception as e:
+        update.message.reply_text(
+            f"❌ Couldn't post to {ANNOUNCE_CHANNEL}: {e}\n"
+            f"Make sure the bot is an admin in that channel."
+        )
 
 def _get_latest_session(chat_id, type_):
     secret = os.environ.get("TELEGRAM_BOT_TOKEN", "")
@@ -3630,9 +3639,10 @@ def _start_session(session_id):
 def startrace(update, context):
     if not is_admin(update):
         return
-    chat_id = update.effective_chat.id
+    # Tap races are anchored to the announcement channel
+    lookup_chat = ANNOUNCE_CHANNEL
     try:
-        latest = _get_latest_session(chat_id, "tap")
+        latest = _get_latest_session(lookup_chat, "tap")
     except urllib.error.HTTPError as e:
         if e.code == 404:
             update.message.reply_text(
@@ -3660,12 +3670,19 @@ def startrace(update, context):
         update.message.reply_text(f"❌ Start failed: {e}")
         return
     players = result.get("players", latest.get("playerCount", 0))
-    update.message.reply_text(
+    started_text = (
         f"🏁 <b>RACE STARTED!</b>\n\n"
         f"👥 {players} player(s) in the lobby\n"
-        f"⏱ 20 seconds — tap your hearts out!",
-        parse_mode="HTML",
+        f"⏱ 20 seconds — tap your hearts out!"
     )
+    # Announce the start in the channel as well
+    try:
+        context.bot.send_message(
+            ANNOUNCE_CHANNEL, started_text, parse_mode="HTML",
+        )
+    except Exception:
+        pass
+    update.message.reply_text(started_text, parse_mode="HTML")
 
 def webraid(update, context):
     if not is_admin(update):

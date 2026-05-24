@@ -14,7 +14,7 @@ type PlayerRecord = {
 type Session = {
   sessionId: string;
   type: "tap" | "raid";
-  chatId: number;
+  chatId: number | string;
   status: "lobby" | "running" | "finished";
   createdAt: number;
   startsAt: number;
@@ -30,7 +30,7 @@ type Session = {
 
 // Latest active session per chat (for bot /startrace lookups)
 const latestByChat = new Map<string, string>();
-function chatKey(chatId: number, type: "tap" | "raid"): string {
+function chatKey(chatId: number | string, type: "tap" | "raid"): string {
   return `${chatId}:${type}`;
 }
 
@@ -74,7 +74,7 @@ function serializeState(s: Session) {
   };
 }
 
-async function postToTelegram(chatId: number, text: string): Promise<void> {
+async function postToTelegram(chatId: number | string, text: string): Promise<void> {
   if (!BOT_TOKEN) {
     console.warn("[play] TELEGRAM_BOT_TOKEN not set; cannot post results");
     return;
@@ -166,7 +166,7 @@ router.post("/play/session", (req: Request, res: Response) => {
   }
   const body = req.body as {
     type?: string;
-    chatId?: number;
+    chatId?: number | string;
     lobbyDurationMs?: number;
     playDurationMs?: number;
     bossHp?: number;
@@ -176,7 +176,7 @@ router.post("/play/session", (req: Request, res: Response) => {
     res.status(400).json({ error: "invalid type" });
     return;
   }
-  if (typeof body.chatId !== "number") {
+  if (typeof body.chatId !== "number" && typeof body.chatId !== "string") {
     res.status(400).json({ error: "chatId required" });
     return;
   }
@@ -250,11 +250,15 @@ router.get("/play/chat/:chatId/latest/:type", (req: Request, res: Response) => {
   }
   const chatIdRaw = req.params["chatId"];
   const typeRaw = req.params["type"];
-  const chatId = Number(typeof chatIdRaw === "string" ? chatIdRaw : "");
-  if (!Number.isFinite(chatId)) {
+  if (typeof chatIdRaw !== "string" || !chatIdRaw) {
     res.status(400).json({ error: "bad chatId" });
     return;
   }
+  // Accept either a numeric id or an @username
+  const asNum = Number(chatIdRaw);
+  const chatId: number | string = Number.isFinite(asNum) && chatIdRaw[0] !== "@"
+    ? asNum
+    : chatIdRaw;
   if (typeRaw !== "tap" && typeRaw !== "raid") {
     res.status(400).json({ error: "bad type" });
     return;
