@@ -1,6 +1,5 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
   description: API specification
@@ -10,13 +9,14 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: dashboard
+    description: Bot admin dashboard
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +24,74 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get overall bot stats
+      responses:
+        "200":
+          description: Summary stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/leaderboard:
+    get:
+      operationId: getDashboardLeaderboard
+      tags: [dashboard]
+      summary: Get ranked leaderboard
+      responses:
+        "200":
+          description: Leaderboard entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaderboardEntry"
+
+  /dashboard/events:
+    get:
+      operationId: getDashboardEvents
+      tags: [dashboard]
+      summary: Get active events
+      responses:
+        "200":
+          description: Active events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventsData"
+
+  /dashboard/tournament:
+    get:
+      operationId: getDashboardTournament
+      tags: [dashboard]
+      summary: Get tournament state
+      responses:
+        "200":
+          description: Tournament data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TournamentData"
+
+  /dashboard/live:
+    get:
+      operationId: getDashboardLive
+      tags: [dashboard]
+      summary: Get live game state
+      responses:
+        "200":
+          description: Live state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiveState"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +102,134 @@ components:
       required:
         - status
 
+    DashboardSummary:
+      type: object
+      properties:
+        totalPlayers:
+          type: integer
+        totalScore:
+          type: integer
+        activeEvents:
+          type: integer
+        tournamentPlayers:
+          type: integer
+        botOnline:
+          type: boolean
+      required:
+        - totalPlayers
+        - totalScore
+        - activeEvents
+        - tournamentPlayers
+        - botOnline
+
+    LeaderboardEntry:
+      type: object
+      properties:
+        rank:
+          type: integer
+        userId:
+          type: string
+        score:
+          type: integer
+      required:
+        - rank
+        - userId
+        - score
+
+    EventItem:
+      type: object
+      properties:
+        title:
+          type: string
+        prize:
+          type: string
+        playerCount:
+          type: integer
+        startTime:
+          type: number
+        endTime:
+          type: number
+        active:
+          type: boolean
+      required:
+        - title
+        - prize
+        - playerCount
+        - startTime
+        - endTime
+        - active
+
+    EventsData:
+      type: object
+      properties:
+        giveaway:
+          oneOf:
+            - $ref: "#/components/schemas/EventItem"
+            - type: "null"
+        premium:
+          oneOf:
+            - $ref: "#/components/schemas/EventItem"
+            - type: "null"
+      required:
+        - giveaway
+        - premium
+
+    TournamentData:
+      type: object
+      properties:
+        playerCount:
+          type: integer
+        playerIds:
+          type: array
+          items:
+            type: string
+        winners:
+          type: array
+          items:
+            type: string
+      required:
+        - playerCount
+        - playerIds
+        - winners
+
+    LiveState:
+      type: object
+      properties:
+        tapRaceActive:
+          type: boolean
+        tapRaceStarted:
+          type: boolean
+        tapRaceMatch:
+          type: array
+          items:
+            type: ["integer", "null"]
+        tapRaceTaps:
+          type: object
+          additionalProperties:
+            type: integer
+        bossRaidActive:
+          type: boolean
+        bossRaidStarted:
+          type: boolean
+        bossRaidHp:
+          type: integer
+        bossRaidMaxHp:
+          type: integer
+        marathonActive:
+          type: boolean
+        botOnline:
+          type: boolean
+        lastUpdated:
+          type: ["number", "null"]
+      required:
+        - tapRaceActive
+        - tapRaceStarted
+        - tapRaceMatch
+        - tapRaceTaps
+        - bossRaidActive
+        - bossRaidStarted
+        - bossRaidHp
+        - bossRaidMaxHp
+        - marathonActive
+        - botOnline
+        - lastUpdated

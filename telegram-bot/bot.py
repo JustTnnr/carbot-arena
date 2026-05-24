@@ -3659,6 +3659,33 @@ def error_handler(update, context):
 dp.add_error_handler(error_handler)
 
 # =========================================================
+# LIVE STATE WRITER (for admin dashboard)
+# =========================================================
+
+def _write_live_state():
+    while True:
+        try:
+            state = {
+                "taprace_active": taprace_active,
+                "taprace_started": taprace_started,
+                "taprace_match": taprace_match,
+                "taprace_taps": taprace_taps,
+                "boss_raid_active": boss_raid is not None,
+                "boss_raid_started": boss_raid["started"] if boss_raid else False,
+                "boss_raid_hp": boss_raid["boss_hp"] if boss_raid else 0,
+                "boss_raid_max_hp": boss_raid["max_hp"] if boss_raid else 0,
+                "marathon_active": marathon_active,
+                "timestamp": time.time(),
+            }
+            with open("bot_live.json", "w") as _f:
+                json.dump(state, _f)
+        except Exception:
+            pass
+        time.sleep(3)
+
+threading.Thread(target=_write_live_state, daemon=True).start()
+
+# =========================================================
 # START BOT (with auto-reconnect)
 # =========================================================
 
