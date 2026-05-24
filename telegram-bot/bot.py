@@ -3,6 +3,7 @@
 # pip install python-telegram-bot==13.15
 # =========================================================
 
+from telegram import WebAppInfo
 from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup
@@ -3594,8 +3595,9 @@ def webtap(update, context):
         f"⏱ Race length: 20s\n\n"
         f"🔗 <a href=\"{url}\">JOIN THE RACE</a>"
     )
+    # WebApp button opens inside Telegram so we get the player's Telegram id/@username
     keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("⚡ JOIN TAP RACE", url=url)
+        InlineKeyboardButton("⚡ JOIN TAP RACE", web_app=WebAppInfo(url=url))
     ]])
     try:
         context.bot.send_message(
@@ -3664,24 +3666,73 @@ def startrace(update, context):
     if status == "running":
         update.message.reply_text("⚠️ The race is already running!")
         return
+    player_count = latest.get("playerCount", 0)
+    update.message.reply_text(
+        f"⏳ Starting in 10 seconds…\nPlayers in lobby: {player_count}"
+    )
+
+    # 10s countdown in the announcement channel; edit a single message
+    countdown_msg = None
+    try:
+        countdown_msg = context.bot.send_message(
+            ANNOUNCE_CHANNEL,
+            "⏳ <b>RACE STARTING IN 10s</b>\nJoin now if you haven't!",
+            parse_mode="HTML",
+        )
+    except Exception:
+        pass
+
+    for remaining in range(10, 0, -1):
+        if countdown_msg is not None:
+            try:
+                context.bot.edit_message_text(
+                    chat_id=ANNOUNCE_CHANNEL,
+                    message_id=countdown_msg.message_id,
+                    text=(
+                        f"⏳ <b>RACE STARTING IN {remaining}s</b>\n"
+                        f"Join now if you haven't!"
+                    ),
+                    parse_mode="HTML",
+                )
+            except Exception:
+                pass
+        time.sleep(1)
+
     try:
         result = _start_session(session_id)
     except Exception as e:
         update.message.reply_text(f"❌ Start failed: {e}")
         return
-    players = result.get("players", latest.get("playerCount", 0))
+
+    players = result.get("players", player_count)
     started_text = (
         f"🏁 <b>RACE STARTED!</b>\n\n"
         f"👥 {players} player(s) in the lobby\n"
         f"⏱ 20 seconds — tap your hearts out!"
     )
-    # Announce the start in the channel as well
-    try:
-        context.bot.send_message(
-            ANNOUNCE_CHANNEL, started_text, parse_mode="HTML",
-        )
-    except Exception:
-        pass
+    if countdown_msg is not None:
+        try:
+            context.bot.edit_message_text(
+                chat_id=ANNOUNCE_CHANNEL,
+                message_id=countdown_msg.message_id,
+                text=started_text,
+                parse_mode="HTML",
+            )
+        except Exception:
+            try:
+                context.bot.send_message(
+                    ANNOUNCE_CHANNEL, started_text, parse_mode="HTML",
+                )
+            except Exception:
+                pass
+    else:
+        try:
+            context.bot.send_message(
+                ANNOUNCE_CHANNEL, started_text, parse_mode="HTML",
+            )
+        except Exception:
+            pass
+
     update.message.reply_text(started_text, parse_mode="HTML")
 
 def webraid(update, context):

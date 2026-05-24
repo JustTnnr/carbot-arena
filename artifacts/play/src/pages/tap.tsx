@@ -1,9 +1,30 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRoute } from "wouter";
 import { useSession, useCountdown } from "@/lib/useSession";
 import { actSession, joinSession } from "@/lib/api";
 
 type PlayerCreds = { playerId: string; token: string; name: string };
+
+type TgUser = {
+  id: number;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+};
+
+function readTelegramUser(): TgUser | null {
+  try {
+    const w = window as unknown as {
+      Telegram?: { WebApp?: { initDataUnsafe?: { user?: TgUser }; ready?: () => void; expand?: () => void } };
+    };
+    const wa = w.Telegram?.WebApp;
+    if (wa?.ready) wa.ready();
+    if (wa?.expand) wa.expand();
+    return wa?.initDataUnsafe?.user ?? null;
+  } catch {
+    return null;
+  }
+}
 
 const STORAGE_PREFIX = "carbot.play.tap.";
 
@@ -31,7 +52,14 @@ export default function TapPage() {
   const [creds, setCreds] = useState<PlayerCreds | null>(() =>
     id ? loadCreds(id) : null,
   );
-  const [name, setName] = useState("");
+  const tgUser = useMemo(() => readTelegramUser(), []);
+  const defaultName =
+    tgUser?.username
+      ? `@${tgUser.username}`
+      : tgUser?.first_name
+        ? [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ")
+        : "";
+  const [name, setName] = useState(defaultName);
   const [joining, setJoining] = useState(false);
   const [joinErr, setJoinErr] = useState<string | null>(null);
   const [localScore, setLocalScore] = useState(0);
@@ -66,7 +94,10 @@ export default function TapPage() {
     setJoining(true);
     setJoinErr(null);
     try {
-      const r = await joinSession(id, trimmed);
+      const r = await joinSession(id, trimmed, {
+        telegramId: tgUser?.id,
+        telegramUsername: tgUser?.username,
+      });
       const next = { playerId: r.playerId, token: r.token, name: trimmed };
       saveCreds(id, next);
       setCreds(next);
@@ -135,6 +166,17 @@ export default function TapPage() {
                 if (e.key === "Enter") void handleJoin();
               }}
             />
+            {tgUser && (
+              <div className="text-xs text-purple-300">
+                Joining as Telegram user{" "}
+                {tgUser.username ? `@${tgUser.username}` : `#${tgUser.id}`}
+              </div>
+            )}
+            {!tgUser && (
+              <div className="text-xs text-yellow-300/80">
+                Tip: open this link from inside Telegram so the bot can recognise you automatically.
+              </div>
+            )}
             {joinErr && <div className="text-red-300 text-xs">{joinErr}</div>}
             <button
               disabled={joining || !name.trim()}

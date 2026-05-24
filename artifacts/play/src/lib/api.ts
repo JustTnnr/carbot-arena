@@ -37,10 +37,18 @@ export function getSession(id: string): Promise<PlaySessionState> {
   return jsonFetch(`/play/session/${id}`);
 }
 
-export function joinSession(id: string, name: string): Promise<JoinResponse> {
+export function joinSession(
+  id: string,
+  name: string,
+  extras?: { telegramId?: number; telegramUsername?: string },
+): Promise<JoinResponse> {
   return jsonFetch(`/play/session/${id}/join`, {
     method: "POST",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({
+      name,
+      telegramId: extras?.telegramId,
+      telegramUsername: extras?.telegramUsername,
+    }),
   });
 }
 

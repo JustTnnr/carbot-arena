@@ -9,6 +9,8 @@ type PlayerRecord = {
   name: string;
   score: number;
   lastActionAt: number;
+  telegramId: number | null;
+  telegramUsername: string | null;
 };
 
 type Session = {
@@ -102,21 +104,33 @@ function finishSession(s: Session, reason: "time" | "boss_killed") {
   const winner = sorted[0] ?? null;
   s.winnerName = winner?.name ?? null;
 
+  const playerLabel = (p: PlayerRecord): string => {
+    const handle = p.telegramUsername ? ` (@${escapeHtml(p.telegramUsername)})` : "";
+    return `<b>${escapeHtml(p.name)}</b>${handle}`;
+  };
+
   let text = "";
   if (s.type === "tap") {
     const lines = sorted
       .slice(0, 5)
-      .map((p, i) => `${i + 1}. <b>${escapeHtml(p.name)}</b> — ${p.score} taps`);
+      .map((p, i) => `${i + 1}. ${playerLabel(p)} — ${p.score} taps`);
+    let winnerBlock = "";
+    if (winner) {
+      const parts = [`🏆 Winner: <b>${escapeHtml(winner.name)}</b>`];
+      if (winner.telegramUsername) parts.push(`@${escapeHtml(winner.telegramUsername)}`);
+      if (winner.telegramId !== null) parts.push(`ID: <code>${winner.telegramId}</code>`);
+      winnerBlock = `\n\n${parts.join(" • ")}`;
+    }
     text = `🏁 <b>WEB TAP RACE FINISHED</b>\n\n${
       lines.join("\n") || "No players joined."
-    }${winner ? `\n\n🏆 Winner: <b>${escapeHtml(winner.name)}</b>` : ""}`;
+    }${winnerBlock}`;
   } else {
     const totalDmg = sorted.reduce((sum, p) => sum + p.score, 0);
     const lines = sorted
       .slice(0, 5)
       .map(
         (p, i) =>
-          `${i + 1}. <b>${escapeHtml(p.name)}</b> — ${p.score.toLocaleString()} dmg`,
+          `${i + 1}. ${playerLabel(p)} — ${p.score.toLocaleString()} dmg`,
       );
     const verdict =
       reason === "boss_killed"
@@ -299,7 +313,11 @@ router.post("/play/session/:id/join", (req: Request, res: Response) => {
     res.status(409).json({ error: "session finished" });
     return;
   }
-  const body = req.body as { name?: string };
+  const body = req.body as {
+    name?: string;
+    telegramId?: number;
+    telegramUsername?: string;
+  };
   const rawName = (body.name ?? "").trim();
   if (!rawName) {
     res.status(400).json({ error: "name required" });
@@ -308,12 +326,22 @@ router.post("/play/session/:id/join", (req: Request, res: Response) => {
   const name = rawName.slice(0, 32);
   const playerId = newId("p");
   const token = crypto.randomBytes(16).toString("hex");
+  const tgId =
+    typeof body.telegramId === "number" && Number.isFinite(body.telegramId)
+      ? Math.trunc(body.telegramId)
+      : null;
+  const tgUsername =
+    typeof body.telegramUsername === "string" && body.telegramUsername.trim()
+      ? body.telegramUsername.trim().slice(0, 32)
+      : null;
   s.players.set(playerId, {
     playerId,
     token,
     name,
     score: 0,
     lastActionAt: 0,
+    telegramId: tgId,
+    telegramUsername: tgUsername,
   });
   res.json({ playerId, token });
 });
