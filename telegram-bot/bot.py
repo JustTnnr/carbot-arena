@@ -837,7 +837,14 @@ f"""
             except:
                 pass
 
-            time.sleep(0.3)
+            # Sleep in 0.5s slices so we can exit fast when answered
+            for _ in range(6):
+                if chat_id not in quiz_data:
+                    answered = True
+                    break
+                time.sleep(0.5)
+            if answered:
+                break
 
         # TIME UP
         if not answered:
@@ -1712,11 +1719,11 @@ def ask_quiz(
         except:
             pass
 
-        time.sleep(0.7)
-
-        # SOMEONE ANSWERED
-        if chat_id not in quiz_data:
-            return
+        # Sleep in 0.5s slices so we can exit fast when answered
+        for _ in range(6):
+            if chat_id not in quiz_data:
+                return
+            time.sleep(0.5)
 
     # TIME UP
     if chat_id in quiz_data:
