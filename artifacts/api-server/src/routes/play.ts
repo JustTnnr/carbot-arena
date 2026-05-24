@@ -196,7 +196,7 @@ function serializeState(s: Session, requestPlayerId?: string) {
         .map((pid) => s.players.get(pid))
         .filter((p): p is PlayerRecord => !!p)
         .sort((a, b) => b.score - a.score)
-        .map((p) => ({ name: p.name, score: p.score })),
+        .map((p) => ({ name: p.name, score: p.score, telegramUsername: p.telegramUsername })),
     }));
     let myTeamIdx: number | null = null;
     if (requestPlayerId) {

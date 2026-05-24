@@ -18,7 +18,7 @@ async function jsonPost<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-type TeamMember = { name: string; score: number };
+type TeamMember = { name: string; score: number; telegramUsername: string | null };
 
 type TeamInfo = {
   teamIdx: number;
@@ -298,11 +298,14 @@ export default function TeamRaidPage() {
                 <ul className="space-y-1">
                   {winnerTeam.members.map((m, i) => (
                     <li key={i} className="flex justify-between items-center bg-black/20 rounded-lg px-3 py-2 text-sm">
-                      <span className="flex items-center gap-2">
-                        <span className="text-yellow-300 font-bold">{i === 0 ? "👑" : `#${i + 1}`}</span>
-                        <span className="font-semibold">{m.name}</span>
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="text-yellow-300 font-bold shrink-0">{i === 0 ? "👑" : `#${i + 1}`}</span>
+                        <span className="font-semibold truncate">{m.name}</span>
+                        {m.telegramUsername && (
+                          <span className="text-xs text-white/50 truncate">@{m.telegramUsername}</span>
+                        )}
                       </span>
-                      <span className="font-mono">{m.score.toLocaleString()} <span className="opacity-70">dmg</span></span>
+                      <span className="font-mono shrink-0 ml-2">{m.score.toLocaleString()} <span className="opacity-70">dmg</span></span>
                     </li>
                   ))}
                 </ul>
@@ -324,8 +327,13 @@ export default function TeamRaidPage() {
                 <ul className="mt-2 space-y-1">
                   {myTeam.members.map((m, i) => (
                     <li key={i} className="flex justify-between text-sm bg-black/20 rounded-lg px-3 py-1">
-                      <span>{m.name}</span>
-                      <span className="font-mono">{m.score.toLocaleString()} dmg</span>
+                      <span className="flex items-center gap-1 min-w-0">
+                        <span className="truncate">{m.name}</span>
+                        {m.telegramUsername && (
+                          <span className="text-xs text-white/50 truncate">@{m.telegramUsername}</span>
+                        )}
+                      </span>
+                      <span className="font-mono shrink-0 ml-2">{m.score.toLocaleString()} dmg</span>
                     </li>
                   ))}
                 </ul>
@@ -354,7 +362,7 @@ export default function TeamRaidPage() {
                   </div>
                   {t.members.length > 0 && (
                     <div className="mt-1 ml-7 text-xs text-rose-200 opacity-80">
-                      {t.members.map((m) => `${m.name} (${m.score.toLocaleString()})`).join(" · ")}
+                      {t.members.map((m) => `${m.name}${m.telegramUsername ? ` @${m.telegramUsername}` : ""} (${m.score.toLocaleString()})`).join(" · ")}
                     </div>
                   )}
                 </li>

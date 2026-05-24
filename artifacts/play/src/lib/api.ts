@@ -28,7 +28,7 @@ export type PlaySessionState = {
   question?: { text: string; options: string[]; correctIdx?: number } | null;
   myAnswer?: number | null;
   // team-raid extras
-  teams?: { teamIdx: number; name: string; totalDamage: number; memberCount: number; full: boolean; members: { name: string; score: number }[] }[];
+  teams?: { teamIdx: number; name: string; totalDamage: number; memberCount: number; full: boolean; members: { name: string; score: number; telegramUsername: string | null }[] }[];
   myTeamIdx?: number | null;
   winnerTeamIdx?: number | null;
 };
