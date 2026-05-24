@@ -23,6 +23,58 @@ import threading
 import time
 import json
 import os
+import http.server
+import socketserver
+
+# =========================================================
+# HEALTH SERVER — starts immediately so port opens fast
+# =========================================================
+
+_HEALTH_START = time.time()
+
+class _HealthHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        uptime_sec = int(time.time() - _HEALTH_START)
+        days = uptime_sec // 86400
+        hours = (uptime_sec % 86400) // 3600
+        mins = (uptime_sec % 3600) // 60
+        secs = uptime_sec % 60
+        body = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Bot Status</title>
+  <style>
+    body {{ font-family: monospace; background: #0d0d0d; color: #00ff88;
+           display: flex; align-items: center; justify-content: center;
+           height: 100vh; margin: 0; }}
+    .box {{ border: 2px solid #00ff88; padding: 40px 60px; text-align: center; }}
+    h1 {{ font-size: 2rem; margin: 0 0 10px; }}
+    p {{ margin: 6px 0; color: #aaa; }}
+    .badge {{ color: #00ff88; font-size: 1.2rem; }}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>🔥 BOT RUNNING</h1>
+    <p class="badge">Status: <strong>Online</strong></p>
+    <p>Uptime: {days}d {hours}h {mins}m {secs}s</p>
+  </div>
+</body>
+</html>"""
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(body.encode())
+    def log_message(self, format, *args):
+        pass
+
+class _ReusableTCPServer(socketserver.TCPServer):
+    allow_reuse_address = True
+
+_HEALTH_PORT = int(os.environ.get("PORT", 3000))
+_health_server = _ReusableTCPServer(("", _HEALTH_PORT), _HealthHandler)
+threading.Thread(target=_health_server.serve_forever, daemon=True).start()
 
 # =========================================================
 # ANIMATED BORDERS
