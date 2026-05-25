@@ -527,6 +527,42 @@ router.get("/play/chat/:chatId/latest/:type", (req: Request, res: Response) => {
   res.json({ sessionId: s.sessionId, status: s.status, playerCount: s.players.size });
 });
 
+// Winner info (bot-authenticated) — returns telegramId(s) for prize distribution
+router.get("/play/session/:id/winner", (req: Request, res: Response) => {
+  const provided = req.header("x-bot-secret") ?? "";
+  if (!BOT_SECRET || provided !== BOT_SECRET) {
+    res.status(403).json({ error: "forbidden" });
+    return;
+  }
+  const s = sessions.get(paramStr(req.params["id"]));
+  if (!s) { res.status(404).json({ error: "not found" }); return; }
+  tickSession(s);
+
+  if (s.status !== "finished") {
+    res.json({ status: s.status, winner: null, winnerTeamMembers: [] });
+    return;
+  }
+
+  if (s.type === "team-raid") {
+    const winIdx = s.winnerTeamIdx;
+    const winTeam = (winIdx != null && s.teams) ? s.teams[winIdx] : null;
+    const members = (winTeam?.memberIds ?? [])
+      .map((pid) => s.players.get(pid))
+      .filter((p): p is PlayerRecord => !!p)
+      .map((p) => ({ telegramId: p.telegramId, name: p.name, telegramUsername: p.telegramUsername }));
+    res.json({ status: "finished", winner: null, winnerTeamMembers: members });
+    return;
+  }
+
+  const sorted = Array.from(s.players.values()).sort((a, b) => b.score - a.score);
+  const top = sorted[0] ?? null;
+  res.json({
+    status: "finished",
+    winner: top ? { telegramId: top.telegramId, name: top.name, telegramUsername: top.telegramUsername } : null,
+    winnerTeamMembers: [],
+  });
+});
+
 // Get session state
 router.get("/play/session/:id", (req: Request, res: Response) => {
   const s = sessions.get(paramStr(req.params["id"]));

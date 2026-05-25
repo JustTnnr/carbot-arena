@@ -506,6 +506,38 @@ def pool_add_lines(lines):
                 f.write(line + "\n")
     return len(clean)
 
+def dm_prize_account(bot_instance, uid, display_name, label="🏆 GAME WIN"):
+    """Take 1 account from pool and DM it to uid.
+    Returns True on success, False if pool empty or DM fails."""
+    account = pool_take()
+    if not account:
+        return False
+    given_append(account, display_name, uid)
+    save_data()
+    border = random.choice(animated_borders)
+    try:
+        bot_instance.send_message(
+            chat_id=uid,
+            text=(
+                f"{border}\n"
+                f"🎁 YOU WON AN ACCOUNT!\n"
+                f"{border}\n\n"
+                f"🏆 REWARD:\n"
+                f"{label}\n\n"
+                f"{border}\n\n"
+                f"<code>{account}</code>\n\n"
+                f"{border}\n\n"
+                f"⚠️ Keep this private — do not share it.\n\n"
+                f"{border}"
+            ),
+            parse_mode="HTML"
+        )
+        return True
+    except Exception:
+        # User hasn't started the bot — return account to pool
+        pool_add_lines([account])
+        return False
+
 # =========================================================
 # HELPERS
 # =========================================================
@@ -1017,6 +1049,11 @@ f"""
         chat_id,
         text
     )
+
+    # DM accounts to each scorer based on total points earned
+    # (accounts were already sent per-round; this is just a summary safety net
+    #  — skip double-sending since per-round DMs already handled it)
+    # Final scoreboard is informational only.
     
     # =========================================================
 # START COMMAND
@@ -2631,6 +2668,21 @@ def check_answer(update, context):
                 ) + 1
             )
 
+            record_name(user.id, user)
+
+            sent = dm_prize_account(
+                context.bot,
+                user.id,
+                safe_name(user),
+                "🎲 MIX QUIZ ROUND WIN"
+            )
+
+            dm_note = (
+                "✅ Account sent to your DMs!"
+                if sent else
+                "⚠️ Start a DM with the bot to receive your account."
+            )
+
             update.message.reply_text(
 f"""
 {border}
@@ -2647,6 +2699,11 @@ f"""
 {border}
 
 🏆 +1 POINT
+🎁 +1 ACCOUNT
+
+{border}
+
+{dm_note}
 
 {border}
 """
@@ -2669,6 +2726,19 @@ f"""
 
             save_data()
 
+            sent = dm_prize_account(
+                context.bot,
+                user.id,
+                safe_name(user),
+                "🚗 QUIZ WIN"
+            )
+
+            dm_note = (
+                "✅ Account sent to your DMs!"
+                if sent else
+                "⚠️ Start a DM with the bot to receive your account."
+            )
+
             update.message.reply_text(
 f"""
 {border}
@@ -2689,7 +2759,7 @@ f"""
 
 {border}
 
-🔥 DM ADMIN NOW 🔥
+{dm_note}
 
 {border}
 """
@@ -4508,6 +4578,7 @@ def webtap(update, context):
     except Exception as e:
         update.message.reply_text(f"❌ Could not create session: {e}")
         return
+    session_id = body.get("sessionId", "")
     url = body.get("url", "")
     text = (
         "⚡ <b>WEB TAP RACE</b> ⚡\n\n"
@@ -4523,7 +4594,6 @@ def webtap(update, context):
         "🏆 Highest score when the timer hits zero wins!\n\n"
         f"🔗 <a href=\"{url}\">JOIN THE RACE</a>"
     )
-    # Channels don't allow web_app buttons — use a plain URL button.
     keyboard = InlineKeyboardMarkup([[
         InlineKeyboardButton("⚡ JOIN TAP RACE", url=url)
     ]])
@@ -4541,6 +4611,13 @@ def webtap(update, context):
             f"❌ Couldn't post to {ANNOUNCE_CHANNEL}: {e}\n"
             f"Make sure the bot is an admin in that channel."
         )
+        return
+    if session_id:
+        threading.Thread(
+            target=_poll_web_session,
+            args=(context.bot, session_id, "WEB TAP RACE"),
+            daemon=True,
+        ).start()
 
 def _get_latest_session(chat_id, type_):
     secret = os.environ.get("TELEGRAM_BOT_TOKEN", "")
@@ -4699,6 +4776,7 @@ def webraid(update, context):
     except Exception as e:
         update.message.reply_text(f"❌ Could not create session: {e}")
         return
+    session_id = body.get("sessionId", "")
     url = body.get("url", "")
     text = (
         "👹 <b>WEB TEAM BOSS RAID</b> 👹\n\n"
@@ -4724,6 +4802,57 @@ def webraid(update, context):
         update.message.reply_text(f"✅ Team Raid posted to {ANNOUNCE_CHANNEL}.")
     except Exception as e:
         update.message.reply_text(f"❌ Couldn't post: {e}")
+        return
+    if session_id:
+        threading.Thread(
+            target=_poll_web_session,
+            args=(context.bot, session_id, "WEB TEAM RAID"),
+            daemon=True,
+        ).start()
+
+def _get_session_winner(session_id):
+    """Fetch winner info from the API (bot-auth). Returns parsed JSON or None."""
+    secret = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    req = urllib.request.Request(
+        f"{_api_base()}/play/session/{session_id}/winner",
+        headers={"X-Bot-Secret": secret},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return None
+
+
+def _poll_web_session(bot_instance, session_id, game_label, timeout=600):
+    """Background thread: polls until the session finishes, then DMs winner(s) 1 account each."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        time.sleep(4)
+        data = _get_session_winner(session_id)
+        if not data:
+            continue
+        status = data.get("status")
+        if status != "finished":
+            continue
+
+        # Single winner (tap, quiz, raid)
+        winner = data.get("winner")
+        if winner and winner.get("telegramId"):
+            tg_id = winner["telegramId"]
+            name = winner.get("name") or winner.get("telegramUsername") or str(tg_id)
+            dm_prize_account(bot_instance, tg_id, name, f"🌐 {game_label}")
+
+        # Team-raid: DM every member of the winning team
+        for member in (data.get("winnerTeamMembers") or []):
+            tg_id = member.get("telegramId")
+            if tg_id:
+                name = member.get("name") or member.get("telegramUsername") or str(tg_id)
+                dm_prize_account(bot_instance, tg_id, name, f"🌐 {game_label}")
+
+        break  # done
+
 
 def _post_web_quiz(update, context, quiz_type, label, emoji):
     if not is_admin(update):
@@ -4738,6 +4867,7 @@ def _post_web_quiz(update, context, quiz_type, label, emoji):
     except Exception as e:
         update.message.reply_text(f"❌ Could not create session: {e}")
         return
+    session_id = body.get("sessionId", "")
     url = body.get("url", "")
     text = (
         f"{emoji} <b>WEB {label.upper()}</b> {emoji}\n\n"
@@ -4757,6 +4887,13 @@ def _post_web_quiz(update, context, quiz_type, label, emoji):
         update.message.reply_text(f"✅ {label} posted to {ANNOUNCE_CHANNEL}.")
     except Exception as e:
         update.message.reply_text(f"❌ Couldn't post: {e}")
+        return
+    if session_id:
+        threading.Thread(
+            target=_poll_web_session,
+            args=(context.bot, session_id, f"WEB {label.upper()}"),
+            daemon=True,
+        ).start()
 
 def webcarquiz(update, context):
     _post_web_quiz(update, context, "carquiz", "Car Quiz", "🚗")
