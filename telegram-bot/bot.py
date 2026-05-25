@@ -356,6 +356,7 @@ _accounts_lock = threading.Lock()
 ACCOUNTS_POOL_FILE = "accounts_pool.txt"
 ACCOUNTS_GIVEN_FILE = "accounts_given.txt"
 ACCOUNT_COOLDOWN = 10  # 10 seconds
+unlimited_mode = False  # when True, cooldown is skipped for all users
 
 account_claims = {}  # {str(user_id): timestamp}
 
@@ -1684,9 +1685,12 @@ def getaccount(update, context):
     record_name(uid, user)
 
     key = str(uid)
-    last_claim = account_claims.get(key, 0)
-    elapsed = now() - last_claim
-    cooldown_remaining = ACCOUNT_COOLDOWN - elapsed
+    if not unlimited_mode:
+        last_claim = account_claims.get(key, 0)
+        elapsed = now() - last_claim
+        cooldown_remaining = ACCOUNT_COOLDOWN - elapsed
+    else:
+        cooldown_remaining = 0
 
     if cooldown_remaining > 0:
         days = cooldown_remaining // 86400
@@ -1755,6 +1759,28 @@ def getaccount(update, context):
 
 
 # =========================================================
+# UNLIMITED MODE  (/unlimited) — admin only
+# =========================================================
+
+def unlimited(update, context):
+    global unlimited_mode
+    if not is_admin(update):
+        return
+    unlimited_mode = not unlimited_mode
+    if unlimited_mode:
+        update.message.reply_text(
+            "🔓 <b>Unlimited mode ON</b> — cooldown is disabled. "
+            "Users can claim accounts with no wait time.\n\n"
+            "Run /unlimited again to turn it off.",
+            parse_mode="HTML",
+        )
+    else:
+        update.message.reply_text(
+            "🔒 <b>Unlimited mode OFF</b> — 10 second cooldown restored.",
+            parse_mode="HTML",
+        )
+
+
 # POOL STATUS  (/poolstatus) — admin only
 # =========================================================
 
@@ -4265,6 +4291,13 @@ dp.add_handler(
     CommandHandler(
         "getaccount",
         getaccount
+    )
+)
+
+dp.add_handler(
+    CommandHandler(
+        "unlimited",
+        unlimited
     )
 )
 
