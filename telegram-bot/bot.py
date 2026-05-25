@@ -355,8 +355,9 @@ _accounts_lock = threading.Lock()
 
 ACCOUNTS_POOL_FILE = "accounts_pool.txt"
 ACCOUNTS_GIVEN_FILE = "accounts_given.txt"
-ACCOUNT_COOLDOWN = 10  # 10 seconds
+ACCOUNT_COOLDOWN = 120  # 2 minutes
 unlimited_mode = False  # when True, cooldown is skipped for all users
+party_mode = False      # when True, users get 1-10 random accounts instead of 1
 
 account_claims = {}  # {str(user_id): timestamp}
 
@@ -1714,83 +1715,44 @@ def getaccount(update, context):
 
     display = safe_name(user)
 
-    if unlimited_mode:
-        count = random.randint(1, 10)
-        accounts = [a for a in (pool_take() for _ in range(count)) if a]
-        if not accounts:
-            update.message.reply_text("❌ No accounts are available right now. Check back later!")
-            return
+    count = random.randint(1, 10) if party_mode else 1
+    accounts = [a for a in (pool_take() for _ in range(count)) if a]
 
-        for acc in accounts:
-            given_append(acc, display, uid)
-        account_claims[key] = now()
-        save_data()
+    if not accounts:
+        update.message.reply_text("❌ No accounts are available right now. Check back later!")
+        return
 
-        dm_text = f"🎁 <b>You got {len(accounts)} account(s)!</b>\n\n"
-        for acc in accounts:
-            dm_text += f"<code>{acc}</code>\n"
-        dm_text += "\n⚠️ Keep these private — do not share them."
+    for acc in accounts:
+        given_append(acc, display, uid)
+    account_claims[key] = now()
+    save_data()
 
-        try:
-            context.bot.send_message(chat_id=uid, text=dm_text, parse_mode="HTML")
+    dm_text = (
+        f"🎁 <b>You got {len(accounts)} account(s)!</b>\n\n"
+        + "".join(f"<code>{acc}</code>\n" for acc in accounts)
+        + "\n⚠️ Keep these private — do not share them."
+    )
+
+    try:
+        context.bot.send_message(chat_id=uid, text=dm_text, parse_mode="HTML")
+        if party_mode:
             update.message.reply_text(
                 f"🎉 <b>{display}</b> just scored <b>{len(accounts)} account(s)</b>! "
                 f"Check your DMs 🔥",
                 parse_mode="HTML"
             )
-        except Exception:
-            pool_add_lines(accounts)
-            for acc in accounts:
-                pass  # already appended to log; acceptable in unlimited events
-            del account_claims[key]
-            save_data()
-            update.message.reply_text(
-                f"⚠️ {display}, I couldn't DM you. Open @{context.bot.username} and press Start, then try again.",
-                parse_mode="HTML"
-            )
-        return
-
-    account = pool_take()
-
-    if account is None:
-        update.message.reply_text(
-            "❌ No accounts are available right now. Check back later!"
-        )
-        return
-
-    given_append(account, display, uid)
-
-    account_claims[key] = now()
-    save_data()
-
-    msg = (
-        f"🎁 <b>Your Account</b>\n\n"
-        f"<code>{account}</code>\n\n"
-        f"⚠️ Keep this private — do not share it.\n"
-        f"You can claim again in 10 seconds."
-    )
-
-    try:
-        context.bot.send_message(
-            chat_id=uid,
-            text=msg,
-            parse_mode="HTML"
-        )
-        update.message.reply_text(
-            f"✅ Account sent to your DMs, {display}!"
-        )
+        else:
+            update.message.reply_text(f"✅ Account sent to your DMs, {display}!")
     except Exception:
-        # DM failed — reverse the claim so the account is not lost
-        pool_add_lines([account])
+        pool_add_lines(accounts)
         del account_claims[key]
         save_data()
-
         update.message.reply_text(
             f"⚠️ {display}, I couldn't send you a DM.\n\n"
             f"<b>Fix it in 2 steps:</b>\n"
             f"1️⃣ Open @{context.bot.username} in Telegram and press <b>Start</b>\n"
             f"2️⃣ If it still fails, go to <b>Telegram Settings → Privacy and Security → Messages</b> and set it to <b>Everybody</b>\n\n"
-            f"✅ <b>Your cooldown has been reset</b> — as soon as you fix the DM issue, run /getaccount again and you'll get your account straight away. No waiting!",
+            f"✅ <b>Your cooldown has been reset</b> — run /getaccount again once fixed. No waiting!",
             parse_mode="HTML"
         )
 
@@ -1813,7 +1775,30 @@ def unlimited(update, context):
         )
     else:
         update.message.reply_text(
-            "🔒 <b>Unlimited mode OFF</b> — 10 second cooldown restored.",
+            "🔒 <b>Unlimited mode OFF</b> — 2 minute cooldown restored.",
+            parse_mode="HTML",
+        )
+
+
+# =========================================================
+# PARTY MODE  (/party) — admin only
+# =========================================================
+
+def party(update, context):
+    global party_mode
+    if not is_admin(update):
+        return
+    party_mode = not party_mode
+    if party_mode:
+        update.message.reply_text(
+            "🎉 <b>Party mode ON</b> — users now get 1–10 random accounts per claim "
+            "and a public shoutout in chat!\n\n"
+            "Run /party again to turn it off.",
+            parse_mode="HTML",
+        )
+    else:
+        update.message.reply_text(
+            "🎈 <b>Party mode OFF</b> — back to 1 account per claim.",
             parse_mode="HTML",
         )
 
@@ -4335,6 +4320,13 @@ dp.add_handler(
     CommandHandler(
         "unlimited",
         unlimited
+    )
+)
+
+dp.add_handler(
+    CommandHandler(
+        "party",
+        party
     )
 )
 
