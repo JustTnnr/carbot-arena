@@ -355,7 +355,7 @@ _accounts_lock = threading.Lock()
 
 ACCOUNTS_POOL_FILE = "accounts_pool.txt"
 ACCOUNTS_GIVEN_FILE = "accounts_given.txt"
-ACCOUNT_COOLDOWN = 3600  # 1 hour in seconds
+ACCOUNT_COOLDOWN = 10  # 10 seconds
 
 account_claims = {}  # {str(user_id): timestamp}
 
