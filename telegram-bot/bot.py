@@ -359,6 +359,13 @@ ACCOUNT_COOLDOWN = 3600  # 1 hour in seconds
 
 account_claims = {}  # {str(user_id): timestamp}
 
+# ── Invite system ─────────────────────────────────────────
+INVITE_RECEIVER_ACCOUNTS = 2   # accounts sent to the person who was invited
+INVITE_SENDER_ACCOUNTS   = 5   # accounts sent to the person who shared the link
+
+invite_pending = {}   # {str(invitee_uid): str(inviter_uid)} — awaiting /claimbonus
+invite_used    = []   # list of int user_ids that already claimed an invite bonus
+
 tournament_players = []
 
 tournament_winners = []
@@ -377,6 +384,8 @@ def save_data():
         "tournament_players": tournament_players,
         "tournament_winners": tournament_winners,
         "account_claims": account_claims,
+        "invite_pending": invite_pending,
+        "invite_used": invite_used,
 
     }
 
@@ -440,6 +449,12 @@ def load_data():
 
     account_claims.update(
         data.get("account_claims", {})
+    )
+
+    invite_pending.update(data.get("invite_pending", {}))
+    invite_used.extend(
+        uid for uid in data.get("invite_used", [])
+        if uid not in invite_used
     )
 
 load_data()
@@ -1007,8 +1022,44 @@ f"""
 def start(update, context):
 
     border = random.choice(animated_borders)
+    user = update.effective_user
+    uid  = user.id
+    record_name(uid, user)
 
-    record_name(update.message.from_user.id, update.message.from_user)
+    # Detect invite deep-link: /start inv_USERID
+    args = context.args or []
+    if args and args[0].startswith("inv_"):
+        inviter_key = args[0][4:]   # strip "inv_"
+        invitee_key = str(uid)
+
+        # Don't let someone invite themselves
+        if inviter_key == invitee_key:
+            update.message.reply_text("❌ You can't use your own invite link.")
+        elif invitee_key in invite_pending:
+            update.message.reply_text(
+                f"ℹ️ You already have a pending invite. Run /claimbonus to collect your accounts."
+            )
+        elif uid in invite_used:
+            update.message.reply_text(
+                "❌ You've already claimed an invite bonus before. This is a one-time reward."
+            )
+        elif inviter_key not in player_names:
+            update.message.reply_text(
+                "❌ That invite link is invalid or the sender hasn't used the bot yet."
+            )
+        else:
+            invite_pending[invitee_key] = inviter_key
+            save_data()
+            inviter_name = player_names[inviter_key]
+            update.message.reply_text(
+                f"🎉 You were invited by <b>{inviter_name}</b>!\n\n"
+                f"To claim your <b>{INVITE_RECEIVER_ACCOUNTS} free accounts</b>:\n"
+                f"1️⃣ Join {ANNOUNCE_CHANNEL} (if you haven't already)\n"
+                f"2️⃣ Run /claimbonus here\n\n"
+                f"You must be a member of the channel to qualify.",
+                parse_mode="HTML",
+            )
+        return
 
     update.message.reply_text(
 f"""
@@ -1723,6 +1774,161 @@ def poolstatus(update, context):
         f"📋 Total users with claims: <b>{len(account_claims)}</b>",
         parse_mode="HTML"
     )
+
+
+# =========================================================
+# INVITE SYSTEM  (/invite + /claimbonus)
+# =========================================================
+
+def _dm_accounts_batch(bot, uid, accounts, header):
+    """DM a list of accounts to uid. Returns True on success."""
+    lines = "\n".join(f"<code>{a}</code>" for a in accounts)
+    msg = f"🎁 <b>{header}</b>\n\n{lines}\n\n⚠️ Keep these private — do not share them."
+    try:
+        bot.send_message(chat_id=uid, text=msg, parse_mode="HTML")
+        return True
+    except Exception:
+        return False
+
+
+def invite(update, context):
+    user = update.effective_user
+    uid  = user.id
+    record_name(uid, user)
+
+    bot_username = context.bot.username
+    link = f"https://t.me/{bot_username}?start=inv_{uid}"
+    display = safe_name(user)
+
+    update.message.reply_text(
+        f"🔗 <b>Your Invite Link</b>\n\n"
+        f"Share this with someone who has <b>never joined {ANNOUNCE_CHANNEL}</b>:\n\n"
+        f"<code>{link}</code>\n\n"
+        f"When they join the channel and run /claimbonus:\n"
+        f"• They get <b>{INVITE_RECEIVER_ACCOUNTS} free accounts</b>\n"
+        f"• You get <b>{INVITE_SENDER_ACCOUNTS} free accounts</b>\n\n"
+        f"⚠️ Only works for new members of {ANNOUNCE_CHANNEL}. One bonus per person.",
+        parse_mode="HTML",
+    )
+
+
+def claimbonus(update, context):
+    user    = update.effective_user
+    uid     = user.id
+    key     = str(uid)
+    display = safe_name(user)
+    record_name(uid, user)
+
+    # Must have a pending invite (i.e. started bot via invite link)
+    inviter_key = invite_pending.get(key)
+    if not inviter_key:
+        update.message.reply_text(
+            "❌ No pending invite found for you.\n"
+            "You need to open an invite link from another user first, then run /claimbonus."
+        )
+        return
+
+    # Already claimed the invite bonus before?
+    if uid in invite_used:
+        update.message.reply_text(
+            "❌ You've already used an invite bonus. This is a one-time reward."
+        )
+        return
+
+    # Must be a member of the announcements channel
+    try:
+        member = context.bot.get_chat_member(ANNOUNCE_CHANNEL, uid)
+        if member.status in ("left", "kicked", "banned"):
+            raise Exception("not a member")
+    except Exception:
+        update.message.reply_text(
+            f"❌ You need to join {ANNOUNCE_CHANNEL} first, then run /claimbonus again."
+        )
+        return
+
+    # Need enough accounts in the pool
+    total_needed = INVITE_RECEIVER_ACCOUNTS + INVITE_SENDER_ACCOUNTS
+    if pool_count() < total_needed:
+        update.message.reply_text(
+            f"❌ Not enough accounts available right now "
+            f"({pool_count()} in pool, {total_needed} needed). Check back later!"
+        )
+        return
+
+    # Pull accounts from pool
+    receiver_accounts = [a for a in (pool_take() for _ in range(INVITE_RECEIVER_ACCOUNTS)) if a]
+    sender_accounts   = [a for a in (pool_take() for _ in range(INVITE_SENDER_ACCOUNTS))   if a]
+
+    # Mark as used and clear the pending entry
+    invite_used.append(uid)
+    del invite_pending[key]
+    save_data()
+
+    # Log to accounts_given.txt
+    inviter_display = player_names.get(inviter_key, f"uid:{inviter_key}")
+    date_str = time.strftime("%Y-%m-%d %H:%M", time.localtime())
+    with _accounts_lock:
+        with open(ACCOUNTS_GIVEN_FILE, "a", encoding="utf-8") as f:
+            for acc in receiver_accounts:
+                f.write(f"{acc} | {display} | {uid} | {date_str} | [invite bonus from {inviter_display}]\n")
+            for acc in sender_accounts:
+                f.write(f"{acc} | {inviter_display} | {inviter_key} | {date_str} | [invite reward for inviting {display}]\n")
+
+    # DM receiver — if this fails, reverse everything
+    if receiver_accounts:
+        ok_receiver = _dm_accounts_batch(
+            context.bot, uid, receiver_accounts,
+            f"Your Invite Bonus — {len(receiver_accounts)} Accounts"
+        )
+        if not ok_receiver:
+            # Reverse: put accounts back, undo claim
+            pool_add_lines(receiver_accounts + sender_accounts)
+            invite_used.remove(uid)
+            invite_pending[key] = inviter_key
+            save_data()
+            update.message.reply_text(
+                f"⚠️ {display}, I couldn't send you a DM.\n\n"
+                f"<b>Fix it in 2 steps:</b>\n"
+                f"1️⃣ Open @{context.bot.username} and press <b>Start</b>\n"
+                f"2️⃣ Go to <b>Telegram Settings → Privacy → Messages</b> → set to <b>Everybody</b>\n\n"
+                f"✅ Your bonus is still waiting — run /claimbonus again once fixed. No waiting!",
+                parse_mode="HTML",
+            )
+            return
+
+    update.message.reply_text(
+        f"✅ {display}, your {len(receiver_accounts)} account(s) have been sent to your DMs!"
+    )
+
+    # DM sender
+    sender_uid = int(inviter_key)
+    if sender_accounts:
+        ok_sender = _dm_accounts_batch(
+            context.bot, sender_uid, sender_accounts,
+            f"Invite Reward — {len(sender_accounts)} Accounts"
+        )
+        try:
+            if ok_sender:
+                context.bot.send_message(
+                    chat_id=sender_uid,
+                    text=(
+                        f"🎉 <b>{display}</b> just joined via your invite link!\n"
+                        f"You earned <b>{len(sender_accounts)} accounts</b> — check your DMs above."
+                    ),
+                    parse_mode="HTML",
+                )
+            else:
+                context.bot.send_message(
+                    chat_id=sender_uid,
+                    text=(
+                        f"🎉 <b>{display}</b> joined via your invite link!\n"
+                        f"⚠️ I couldn't DM your {len(sender_accounts)} reward account(s) — "
+                        f"please open @{context.bot.username} and press Start so I can reach you."
+                    ),
+                    parse_mode="HTML",
+                )
+        except Exception:
+            pass
 
 
 # =========================================================
@@ -3914,6 +4120,20 @@ dp.add_handler(
     CommandHandler(
         "poolstatus",
         poolstatus
+    )
+)
+
+dp.add_handler(
+    CommandHandler(
+        "invite",
+        invite
+    )
+)
+
+dp.add_handler(
+    CommandHandler(
+        "claimbonus",
+        claimbonus
     )
 )
 
