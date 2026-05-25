@@ -6,3 +6,9 @@ id = "r3NQsO_B89pWrLH-2NDBB"
 uri = "file://telegram-bot/accounts_given.txt"
 type = "text"
 title = "Accounts Given Log"
+
+[[outputs]]
+id = "M2ki6rtDVVfYPjnFXttIy"
+uri = "file://telegram-bot/accounts_leaderboard.txt"
+type = "text"
+title = "Accounts Given — Leaderboard"
