@@ -1810,9 +1810,6 @@ def party(update, context):
 
 def poolstatus(update, context):
 
-    if not is_admin(update):
-        return
-
     remaining = pool_count()
 
     given_count = 0
