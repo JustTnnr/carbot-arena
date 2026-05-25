@@ -148,6 +148,7 @@ export default function TeamRaidPage() {
   };
 
   const startsIn = useCountdown(state?.startsAt ?? null, serverOffset);
+  const endsIn = useCountdown(state?.endsAt ?? null, serverOffset);
 
   if (error && !state) {
     return <Shell><div className="text-center text-red-300">Session unavailable. {error}</div></Shell>;
@@ -166,7 +167,12 @@ export default function TeamRaidPage() {
   const me = state.players.find((p) => p.playerId === creds?.playerId);
   const myScore = me?.score ?? localDmg;
 
-  const sortedTeams = [...state.teams].sort((a, b) => b.totalDamage - a.totalDamage);
+  const sortedTeams = [...state.teams]
+    .sort((a, b) => {
+      const avgA = a.memberCount > 0 ? a.totalDamage / a.memberCount : 0;
+      const avgB = b.memberCount > 0 ? b.totalDamage / b.memberCount : 0;
+      return avgB - avgA;
+    });
 
   // ── Name entry ───────────────────────────────────────────────────────────────
   if (!creds && step === "name") {
@@ -177,9 +183,19 @@ export default function TeamRaidPage() {
             <div className="text-6xl mb-2">👹</div>
             <h1 className="text-2xl font-bold">Team Boss Raid</h1>
             <p className="text-rose-300 text-sm mt-1">
-              12 teams · 3 players max each · most damage wins
+              12 teams · 3 players max each
             </p>
           </div>
+
+          {/* Rules box */}
+          <div className="rounded-2xl bg-black/30 border border-rose-500/40 p-4 space-y-2 text-sm">
+            <div className="font-bold text-rose-300 uppercase tracking-wide text-xs mb-3">Rules</div>
+            <div className="flex items-start gap-2"><span>⚔️</span><span>Every tap deals <b>10 damage</b> to the boss</span></div>
+            <div className="flex items-start gap-2"><span>⏱</span><span><b>60 seconds</b> — raid ends when the timer hits zero</span></div>
+            <div className="flex items-start gap-2"><span>🏆</span><span>Winner = team with the <b>highest average damage per player</b> — so a solo player can beat a full team!</span></div>
+            <div className="flex items-start gap-2"><span>🐢</span><span>One tap every <b>0.3 seconds</b> max — no spamming</span></div>
+          </div>
+
           <div className="space-y-3">
             <label className="text-sm text-rose-300">Your display name</label>
             <input
@@ -343,30 +359,43 @@ export default function TeamRaidPage() {
 
           {/* Full team rankings */}
           <div className="rounded-2xl bg-white/10 border border-white/20 p-4">
-            <div className="font-semibold mb-3 text-sm">All Team Rankings</div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="font-semibold text-sm">All Team Rankings</div>
+              <div className="text-xs text-rose-400">avg dmg/player</div>
+            </div>
             <ul className="space-y-2">
-              {sortedTeams.filter(t => t.totalDamage > 0).map((t, i) => (
-                <li
-                  key={t.teamIdx}
-                  className={`px-3 py-2 rounded-lg ${
-                    t.teamIdx === winnerIdx ? "bg-yellow-400/20 ring-1 ring-yellow-400" :
-                    t.teamIdx === myTeamIdx ? "bg-rose-500/20 ring-1 ring-rose-400" : "bg-white/5"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <span className="w-5 text-rose-300 text-sm">{i + 1}</span>
-                      <span className="font-semibold">{t.name}</span>
-                    </span>
-                    <span className="font-mono font-semibold text-sm">{t.totalDamage.toLocaleString()} <span className="text-xs text-rose-300">dmg</span></span>
-                  </div>
-                  {t.members.length > 0 && (
-                    <div className="mt-1 ml-7 text-xs text-rose-200 opacity-80">
-                      {t.members.map((m) => `${m.name}${m.telegramUsername ? ` @${m.telegramUsername}` : ""} (${m.score.toLocaleString()})`).join(" · ")}
+              {sortedTeams.filter(t => t.totalDamage > 0).map((t, i) => {
+                const avg = t.memberCount > 0 ? Math.round(t.totalDamage / t.memberCount) : 0;
+                return (
+                  <li
+                    key={t.teamIdx}
+                    className={`px-3 py-2 rounded-lg ${
+                      t.teamIdx === winnerIdx ? "bg-yellow-400/20 ring-1 ring-yellow-400" :
+                      t.teamIdx === myTeamIdx ? "bg-rose-500/20 ring-1 ring-rose-400" : "bg-white/5"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <span className="w-5 text-rose-300 text-sm">{i + 1}</span>
+                        <span className="font-semibold">{t.name}</span>
+                      </span>
+                      <span className="font-mono font-semibold text-sm">
+                        {avg.toLocaleString()} <span className="text-xs text-rose-300">avg</span>
+                      </span>
                     </div>
-                  )}
-                </li>
-              ))}
+                    {t.memberCount > 1 && (
+                      <div className="text-xs text-rose-300/60 mt-0.5 ml-7">
+                        {t.totalDamage.toLocaleString()} total · {t.memberCount} players
+                      </div>
+                    )}
+                    {t.members.length > 0 && (
+                      <div className="mt-1 ml-7 text-xs text-rose-200 opacity-70">
+                        {t.members.map((m) => `${m.name}${m.telegramUsername ? ` @${m.telegramUsername}` : ""} (${m.score.toLocaleString()})`).join(" · ")}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </div>
@@ -375,6 +404,9 @@ export default function TeamRaidPage() {
   }
 
   // ── Running ───────────────────────────────────────────────────────────────────
+  const endsInSec = Math.max(0, Math.ceil(endsIn / 1000));
+  const timerColor = endsInSec <= 10 ? "text-red-400 animate-pulse" : endsInSec <= 20 ? "text-yellow-300" : "text-rose-300";
+
   return (
     <Shell>
       <div className="space-y-4">
@@ -383,7 +415,9 @@ export default function TeamRaidPage() {
           <div className="text-sm text-rose-300">
             {myTeam ? <span className="font-bold">{myTeam.name}</span> : "Team Raid"}
           </div>
-          <div className="text-sm font-mono text-rose-300">No time limit</div>
+          <div className={`text-lg font-mono font-black ${timerColor}`}>
+            {endsInSec}s
+          </div>
         </div>
 
         {/* Boss HP */}
@@ -419,25 +453,38 @@ export default function TeamRaidPage() {
 
         {/* Team leaderboard */}
         <div className="rounded-2xl bg-white/10 border border-white/20 p-4">
-          <div className="font-semibold mb-3 text-sm">Team Damage</div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="font-semibold text-sm">Team Rankings</div>
+            <div className="text-xs text-rose-400">avg dmg/player wins</div>
+          </div>
           <ul className="space-y-2">
-            {sortedTeams.filter(t => t.totalDamage > 0 || t.teamIdx === myTeamIdx).map((t, i) => (
-              <li
-                key={t.teamIdx}
-                className={`flex items-center justify-between px-3 py-2 rounded-lg ${
-                  t.teamIdx === myTeamIdx ? "bg-rose-500/30 ring-1 ring-rose-400" : "bg-white/5"
-                }`}
-              >
-                <span className="flex items-center gap-2 min-w-0">
-                  <span className="w-5 text-rose-300 text-sm">{i + 1}</span>
-                  <span className="font-semibold truncate">{t.name}</span>
-                  <span className="text-xs text-rose-400">{t.memberCount}/3</span>
-                </span>
-                <span className="font-mono font-semibold text-sm">
-                  {t.totalDamage.toLocaleString()} <span className="text-xs text-rose-300">dmg</span>
-                </span>
-              </li>
-            ))}
+            {sortedTeams.filter(t => t.totalDamage > 0 || t.teamIdx === myTeamIdx).map((t, i) => {
+              const avg = t.memberCount > 0 ? Math.round(t.totalDamage / t.memberCount) : 0;
+              return (
+                <li
+                  key={t.teamIdx}
+                  className={`px-3 py-2 rounded-lg ${
+                    t.teamIdx === myTeamIdx ? "bg-rose-500/30 ring-1 ring-rose-400" : "bg-white/5"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="w-5 text-rose-300 text-sm">{i + 1}</span>
+                      <span className="font-semibold truncate">{t.name}</span>
+                      <span className="text-xs text-rose-400">{t.memberCount}/3</span>
+                    </span>
+                    <span className="font-mono font-semibold text-sm">
+                      {avg.toLocaleString()} <span className="text-xs text-rose-300">avg</span>
+                    </span>
+                  </div>
+                  {t.memberCount > 1 && (
+                    <div className="text-xs text-rose-300/60 mt-0.5 ml-7">
+                      {t.totalDamage.toLocaleString()} total · {t.memberCount} players
+                    </div>
+                  )}
+                </li>
+              );
+            })}
             {sortedTeams.filter(t => t.totalDamage === 0 && t.teamIdx !== myTeamIdx).length > 0 && (
               <li className="text-xs text-rose-400 text-center pt-1">
                 {sortedTeams.filter(t => t.totalDamage === 0).length} teams haven't dealt damage yet

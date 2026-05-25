@@ -4195,7 +4195,7 @@ def webraid(update, context):
             "type": "team-raid",
             "chatId": ANNOUNCE_CHANNEL,
             "lobbyDurationMs": 0,
-            "playDurationMs": 86400000,
+            "playDurationMs": 60000,
             "bossHp": 30000,
         })
     except Exception as e:
@@ -4205,12 +4205,14 @@ def webraid(update, context):
     text = (
         "👹 <b>WEB TEAM BOSS RAID</b> 👹\n\n"
         "<b>12 teams</b> (3 players max each) vs. the Boss!\n"
-        "Pick your team, deal the most damage, and slay the boss!\n\n"
+        "Pick your team and deal as much damage as you can!\n\n"
         "<b>Rules</b>\n"
         "⚔️ Every tap = 10 damage\n"
-        "💀 First team combo to kill the boss wins!\n"
-        "🏆 Most team damage when boss dies = winning team!\n\n"
-        f"❤️ Boss HP: 30,000 • Join anytime!\n\n"
+        "⏱ <b>60 seconds</b> — raid ends when the timer hits zero\n"
+        "🏆 Winner = team with the <b>highest average damage per player</b>\n"
+        "   (so a solo player can still beat a full team!)\n"
+        "🐢 One tap every 0.3s max — no spamming\n\n"
+        f"❤️ Boss HP: 30,000\n\n"
         f"🔗 <a href=\"{url}\">JOIN TEAM RAID</a>"
     )
     keyboard = InlineKeyboardMarkup([[

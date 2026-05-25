@@ -259,12 +259,17 @@ function finishSession(s: Session, reason: "time" | "boss_killed") {
       .map((p, i) => `${i + 1}. ${playerLabel(p)} — ${p.score}/${totalQ} correct`);
     text = `🧠 <b>WEB ${quizLabel(s.quizType ?? "")} FINISHED</b>\n\n${lines.join("\n") || "No players joined."}${winner ? `\n\n🏆 Winner: <b>${escapeHtml(winner.name)}</b>` : ""}`;
   } else if (s.type === "team-raid") {
-    // Winner = team with most totalDamage
+    // Winner = team with highest average damage per member
     const teams = s.teams ?? [];
-    const teamsById = teams
-      .map((t, idx) => ({ ...t, idx }))
-      .sort((a, b) => b.totalDamage - a.totalDamage);
-    const winTeam = teamsById[0] ?? null;
+    const teamsWithAvg = teams
+      .map((t, idx) => ({
+        ...t,
+        idx,
+        memberCount: t.memberIds.length,
+        avgDamage: t.memberIds.length > 0 ? t.totalDamage / t.memberIds.length : 0,
+      }))
+      .sort((a, b) => b.avgDamage - a.avgDamage);
+    const winTeam = teamsWithAvg[0] ?? null;
     s.winnerTeamIdx = winTeam?.idx ?? null;
     s.winnerName = winTeam ? `Team ${winTeam.name}` : null;
 
@@ -284,7 +289,7 @@ function finishSession(s: Session, reason: "time" | "boss_killed") {
       }
     }
 
-    const lines = teamsById
+    const lines = teamsWithAvg
       .filter((t) => t.totalDamage > 0)
       .slice(0, 8)
       .map((t, i) => {
@@ -292,13 +297,15 @@ function finishSession(s: Session, reason: "time" | "boss_killed") {
           .map((pid) => s.players.get(pid)?.name ?? "?")
           .map(escapeHtml)
           .join(", ");
-        return `${i + 1}. <b>Team ${escapeHtml(t.name)}</b> — ${t.totalDamage.toLocaleString()} dmg` +
-          (memberNames ? ` (${memberNames})` : "");
+        return `${i + 1}. <b>Team ${escapeHtml(t.name)}</b> — avg ${Math.round(t.avgDamage).toLocaleString()} dmg/player (${t.totalDamage.toLocaleString()} total, ${t.memberCount} member${t.memberCount !== 1 ? "s" : ""})` +
+          (memberNames ? ` — ${memberNames}` : "");
       });
+
+    const verdict = reason === "boss_killed" ? "💀 Boss Defeated!" : "⏱ Time's up!";
     text =
-      `👹 <b>WEB TEAM BOSS RAID FINISHED</b>\n\n` +
-      (winTeam ? `🏆 Winner: <b>Team ${escapeHtml(winTeam.name)}</b> with ${winTeam.totalDamage.toLocaleString()} dmg!\n${winnerMembersBlock}\n` : "") +
-      `<b>All Team Rankings:</b>\n${lines.join("\n") || "No teams participated."}`;
+      `👹 <b>WEB TEAM BOSS RAID FINISHED — ${verdict}</b>\n\n` +
+      (winTeam ? `🏆 Winner: <b>Team ${escapeHtml(winTeam.name)}</b> — avg ${Math.round(winTeam.avgDamage).toLocaleString()} dmg/player!\n${winnerMembersBlock}\n` : "") +
+      `<b>All Team Rankings (avg dmg/player):</b>\n${lines.join("\n") || "No teams participated."}`;
   }
 
   void postToTelegram(s.chatId, text);
@@ -341,7 +348,9 @@ function tickSession(s: Session): void {
         }
       }
     } else if (s.type === "team-raid") {
-      // No time limit for team-raid — ends only when boss is killed
+      if (now >= s.endsAt) {
+        finishSession(s, "time");
+      }
     } else if (now >= s.endsAt) {
       finishSession(s, "time");
     }
@@ -674,7 +683,8 @@ router.post("/play/session/:id/action", (req: Request, res: Response) => {
   }
 
   const now = Date.now();
-  if (now - player.lastActionAt < 80) {
+  const tapCooldownMs = s.type === "team-raid" ? 300 : 80;
+  if (now - player.lastActionAt < tapCooldownMs) {
     res.json({ score: player.score, bossHp: s.bossHp ?? null });
     return;
   }
