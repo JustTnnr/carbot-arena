@@ -355,7 +355,7 @@ _accounts_lock = threading.Lock()
 
 ACCOUNTS_POOL_FILE = "accounts_pool.txt"
 ACCOUNTS_GIVEN_FILE = "accounts_given.txt"
-ACCOUNT_COOLDOWN = 604800  # 7 days in seconds
+ACCOUNT_COOLDOWN = 3600  # 1 hour in seconds
 
 account_claims = {}  # {str(user_id): timestamp}
 
@@ -1672,7 +1672,7 @@ def getaccount(update, context):
         f"🎁 <b>Your Account</b>\n\n"
         f"<code>{account}</code>\n\n"
         f"⚠️ Keep this private — do not share it.\n"
-        f"You can claim again in 7 days."
+        f"You can claim again in 1 hour."
     )
 
     try:
