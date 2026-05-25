@@ -5596,8 +5596,8 @@ while True:
     try:
         updater.start_polling(
             timeout=10,
-            read_latency=1,
-            drop_pending_updates=False,
+            read_latency=2,
+            drop_pending_updates=True,
         )
         print("""
 ______________
