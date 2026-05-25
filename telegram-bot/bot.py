@@ -326,6 +326,10 @@ events = {
 
 quiz_data = {}
 
+# Tracks in-flight web game sessions so poll threads survive bot restarts
+# { session_id: {"label": str, "started_at": float} }
+active_web_sessions: dict = {}
+
 marathon_active = False
 marathon_scores = {}
 
@@ -402,6 +406,7 @@ def save_data():
         "invite_used": invite_used,
         "user_registry": user_registry,
         "pending_prizes": pending_prizes,
+        "active_web_sessions": active_web_sessions,
 
     }
 
@@ -505,6 +510,8 @@ def load_data():
         uname = rec.get("username")
         if uname:
             username_to_uid[uname.lower()] = int(rec.get("uid", key))
+
+    active_web_sessions.update(data.get("active_web_sessions", {}))
 
 load_data()
 
@@ -2851,7 +2858,21 @@ def check_answer(update, context):
 
     global mix_quiz_scores
 
+    try:
+        _check_answer_inner(update, context)
+    except Exception as exc:
+        import traceback
+        print(f"[check_answer ERROR] {exc}")
+        traceback.print_exc()
+
+
+def _check_answer_inner(update, context):
+
+    global mix_quiz_scores
+
     chat_id = update.effective_chat.id
+    active = list(quiz_data.keys())
+    print(f"[check_answer] chat={chat_id} active_quizzes={active} text={update.message.text!r:.40}")
 
     border = random.choice(animated_borders)
 
@@ -2859,6 +2880,7 @@ def check_answer(update, context):
         return
 
     if now() > quiz_data[chat_id]["end"]:
+        print(f"[check_answer] quiz expired for chat={chat_id}")
         return
 
     answer = (
@@ -2873,11 +2895,13 @@ def check_answer(update, context):
 
         user = update.message.from_user
 
+        print(f"[QUIZ] Correct answer from uid={user.id} in chat={chat_id} mix={quiz_data[chat_id].get('mix')}")
+
         total_games[user.id] = (
             total_games.get(user.id, 0) + 1
         )
-        
-    # =================================================
+
+        # =================================================
         # MIX QUIZ POINTS
         # =================================================
 
@@ -4825,11 +4849,7 @@ def webtap(update, context):
         )
         return
     if session_id:
-        threading.Thread(
-            target=_poll_web_session,
-            args=(context.bot, session_id, "WEB TAP RACE"),
-            daemon=True,
-        ).start()
+        _start_poll_thread(context.bot, session_id, "WEB TAP RACE")
 
 def _get_latest_session(chat_id, type_):
     secret = os.environ.get("TELEGRAM_BOT_TOKEN", "")
@@ -5016,24 +5036,28 @@ def webraid(update, context):
         update.message.reply_text(f"❌ Couldn't post: {e}")
         return
     if session_id:
-        threading.Thread(
-            target=_poll_web_session,
-            args=(context.bot, session_id, "WEB TEAM RAID"),
-            daemon=True,
-        ).start()
+        _start_poll_thread(context.bot, session_id, "WEB TEAM RAID")
 
 def _get_session_winner(session_id):
     """Fetch winner info from the API (bot-auth). Returns parsed JSON or None."""
     secret = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-    req = urllib.request.Request(
-        f"{_api_base()}/play/session/{session_id}/winner",
-        headers={"X-Bot-Secret": secret},
-        method="GET",
-    )
+    url = f"{_api_base()}/play/session/{session_id}/winner"
+    req = urllib.request.Request(url, headers={"X-Bot-Secret": secret}, method="GET")
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except Exception:
+            data = json.loads(resp.read().decode("utf-8"))
+            print(f"[POLL] {session_id} → status={data.get('status')} winner={data.get('winner')} members={data.get('winnerTeamMembers')}")
+            return data
+    except urllib.error.HTTPError as e:
+        body = ""
+        try:
+            body = e.read().decode("utf-8")[:200]
+        except Exception:
+            pass
+        print(f"[POLL] {session_id} → HTTP {e.code}: {body}")
+        return None
+    except Exception as e:
+        print(f"[POLL] {session_id} → error: {e}")
         return None
 
 
@@ -5050,39 +5074,101 @@ def _resolve_tg_id(tg_id, tg_username):
     return None
 
 
-def _poll_web_session(bot_instance, session_id, game_label, timeout=600):
+def _start_poll_thread(bot_instance, session_id, game_label, started_at=None):
+    """Register a session and launch its poll thread. Call this instead of threading.Thread directly."""
+    t = started_at or time.time()
+    active_web_sessions[session_id] = {"label": game_label, "started_at": t}
+    save_data()
+    threading.Thread(
+        target=_poll_web_session,
+        args=(bot_instance, session_id, game_label, t),
+        daemon=True,
+    ).start()
+    print(f"[POLL] registered+launched {session_id} ({game_label})")
+
+
+def _poll_web_session(bot_instance, session_id, game_label, started_at=None, timeout=600):
     """Background thread: polls until the session finishes, then DMs winner(s) 1 account each."""
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        time.sleep(4)
-        data = _get_session_winner(session_id)
-        if not data:
-            continue
-        if data.get("status") != "finished":
-            continue
+    started_at = started_at or time.time()
+    deadline = started_at + timeout
+    print(f"[POLL] started polling {session_id} ({game_label})")
+    consecutive_404 = 0
+    try:
+        while time.time() < deadline:
+            time.sleep(4)
+            data = _get_session_winner(session_id)
+            if not data:
+                consecutive_404 += 1
+                if consecutive_404 >= 5:
+                    print(f"[POLL] {session_id} — 5× 404, session gone, aborting")
+                    return
+                continue
+            consecutive_404 = 0
 
-        # Single winner (tap, quiz, raid)
-        winner = data.get("winner")
-        if winner:
-            uid = _resolve_tg_id(
-                winner.get("telegramId"),
-                winner.get("telegramUsername")
-            )
-            if uid:
-                name = winner.get("name") or winner.get("telegramUsername") or str(uid)
-                dm_prize_account(bot_instance, uid, name, f"🌐 {game_label}")
+            status = data.get("status")
+            if status != "finished":
+                continue
 
-        # Team-raid: DM every member of the winning team
-        for member in (data.get("winnerTeamMembers") or []):
-            uid = _resolve_tg_id(
-                member.get("telegramId"),
-                member.get("telegramUsername")
-            )
-            if uid:
-                name = member.get("name") or member.get("telegramUsername") or str(uid)
-                dm_prize_account(bot_instance, uid, name, f"🌐 {game_label}")
+            print(f"[POLL] {session_id} FINISHED — processing winner(s)")
+            border = random.choice(animated_borders)
+            winner_names = []
 
-        break  # done
+            # Single winner (tap, quiz, raid)
+            winner = data.get("winner")
+            if winner:
+                print(f"[POLL] winner raw: {winner}")
+                uid = _resolve_tg_id(winner.get("telegramId"), winner.get("telegramUsername"))
+                print(f"[POLL] resolved uid={uid}")
+                if uid:
+                    name = winner.get("name") or winner.get("telegramUsername") or str(uid)
+                    sent = dm_prize_account(bot_instance, uid, name, f"🌐 {game_label}")
+                    print(f"[POLL] dm_prize_account → sent={sent}")
+                    winner_names.append((name, sent))
+                else:
+                    print(f"[POLL] could not resolve uid for winner={winner}")
+
+            # Team-raid: DM every member of the winning team
+            for member in (data.get("winnerTeamMembers") or []):
+                uid = _resolve_tg_id(member.get("telegramId"), member.get("telegramUsername"))
+                if uid:
+                    name = member.get("name") or member.get("telegramUsername") or str(uid)
+                    sent = dm_prize_account(bot_instance, uid, name, f"🌐 {game_label}")
+                    print(f"[POLL] team member uid={uid} → sent={sent}")
+                    winner_names.append((name, sent))
+                else:
+                    print(f"[POLL] could not resolve uid for member={member}")
+
+            # Post winner announcement to channel
+            if winner_names:
+                try:
+                    lines = []
+                    for name, sent in winner_names:
+                        status_icon = "✅" if sent else "⚠️"
+                        lines.append(f"{status_icon} {name}")
+                    bot_instance.send_message(
+                        ANNOUNCE_CHANNEL,
+                        f"{border}\n"
+                        f"🏆 {game_label} WINNER(S) 🏆\n"
+                        f"{border}\n\n"
+                        + "\n".join(lines) + "\n\n"
+                        + "🎁 Account sent to your DMs!\n\n"
+                        + (
+                            "⚠️ If you didn't receive it, check\n"
+                            "the bot's instructions in your DMs.\n\n"
+                            if any(not s for _, s in winner_names) else ""
+                        )
+                        + f"{border}",
+                        parse_mode=None,
+                    )
+                except Exception as e:
+                    print(f"[POLL] couldn't post winner announcement: {e}")
+
+            return  # done — finally block will clean up
+
+        print(f"[POLL] {session_id} timed out after {timeout}s — no winner found")
+    finally:
+        active_web_sessions.pop(session_id, None)
+        save_data()
 
 
 def _post_web_quiz(update, context, quiz_type, label, emoji):
@@ -5120,11 +5206,7 @@ def _post_web_quiz(update, context, quiz_type, label, emoji):
         update.message.reply_text(f"❌ Couldn't post: {e}")
         return
     if session_id:
-        threading.Thread(
-            target=_poll_web_session,
-            args=(context.bot, session_id, f"WEB {label.upper()}"),
-            daemon=True,
-        ).start()
+        _start_poll_thread(context.bot, session_id, f"WEB {label.upper()}")
 
 def webcarquiz(update, context):
     _post_web_quiz(update, context, "carquiz", "Car Quiz", "🚗")
@@ -5532,6 +5614,30 @@ ______________
 🔥 BOT RUNNING 🔥
 ______________
 """)
+
+        # ── Recover in-flight web game sessions from last run ──────────────
+        now_ts = time.time()
+        recovered = 0
+        stale = []
+        for sid, info in list(active_web_sessions.items()):
+            age = now_ts - info.get("started_at", 0)
+            if age >= 600:
+                stale.append(sid)
+            else:
+                remaining = 600 - age
+                print(f"[POLL] recovering {sid} ({info['label']}) — {int(remaining)}s left")
+                threading.Thread(
+                    target=_poll_web_session,
+                    args=(updater.bot, sid, info["label"], info.get("started_at", now_ts)),
+                    daemon=True,
+                ).start()
+                recovered += 1
+        for sid in stale:
+            active_web_sessions.pop(sid, None)
+        if stale:
+            save_data()
+        if recovered:
+            print(f"[POLL] recovered {recovered} session(s) from last run")
         updater.idle()
         break
 
