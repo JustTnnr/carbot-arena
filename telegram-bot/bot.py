@@ -347,6 +347,17 @@ match_running = False
 
 _tap_lock = threading.Lock()
 _raid_lock = threading.Lock()
+_accounts_lock = threading.Lock()
+
+# =========================================================
+# ACCOUNT DISTRIBUTION CONFIG
+# =========================================================
+
+ACCOUNTS_POOL_FILE = "accounts_pool.txt"
+ACCOUNTS_GIVEN_FILE = "accounts_given.txt"
+ACCOUNT_COOLDOWN = 604800  # 7 days in seconds
+
+account_claims = {}  # {str(user_id): timestamp}
 
 tournament_players = []
 
@@ -364,7 +375,8 @@ def save_data():
         "player_names": player_names,
         "events": events,
         "tournament_players": tournament_players,
-        "tournament_winners": tournament_winners
+        "tournament_winners": tournament_winners,
+        "account_claims": account_claims,
 
     }
 
@@ -426,7 +438,55 @@ def load_data():
         []
     )
 
+    account_claims.update(
+        data.get("account_claims", {})
+    )
+
 load_data()
+
+# =========================================================
+# ACCOUNT POOL HELPERS
+# =========================================================
+
+def pool_count():
+    if not os.path.exists(ACCOUNTS_POOL_FILE):
+        return 0
+    with open(ACCOUNTS_POOL_FILE, "r", encoding="utf-8") as f:
+        return sum(1 for line in f if line.strip())
+
+def pool_take():
+    """Remove and return the first account line. Returns None if empty."""
+    with _accounts_lock:
+        if not os.path.exists(ACCOUNTS_POOL_FILE):
+            return None
+        with open(ACCOUNTS_POOL_FILE, "r", encoding="utf-8") as f:
+            lines = [l.rstrip("\n") for l in f.readlines()]
+        available = [l for l in lines if l.strip()]
+        if not available:
+            return None
+        account = available[0].strip()
+        remaining = available[1:]
+        with open(ACCOUNTS_POOL_FILE, "w", encoding="utf-8") as f:
+            f.write("\n".join(remaining) + ("\n" if remaining else ""))
+        return account
+
+def given_append(account, user_display, user_id):
+    date_str = time.strftime("%Y-%m-%d %H:%M", time.localtime())
+    line = f"{account} | {user_display} | {user_id} | {date_str}\n"
+    with _accounts_lock:
+        with open(ACCOUNTS_GIVEN_FILE, "a", encoding="utf-8") as f:
+            f.write(line)
+
+def pool_add_lines(lines):
+    """Append a list of account strings to the pool. Returns count added."""
+    clean = [l.strip() for l in lines if l.strip()]
+    if not clean:
+        return 0
+    with _accounts_lock:
+        with open(ACCOUNTS_POOL_FILE, "a", encoding="utf-8") as f:
+            for line in clean:
+                f.write(line + "\n")
+    return len(clean)
 
 # =========================================================
 # HELPERS
@@ -1561,6 +1621,147 @@ f"""
     events[key] = None
 
     save_data()
+
+# =========================================================
+# GET ACCOUNT  (/getaccount) — available to all users
+# =========================================================
+
+def getaccount(update, context):
+
+    uid = update.effective_user.id
+    user = update.effective_user
+    record_name(uid, user)
+
+    key = str(uid)
+    last_claim = account_claims.get(key, 0)
+    elapsed = now() - last_claim
+    cooldown_remaining = ACCOUNT_COOLDOWN - elapsed
+
+    if cooldown_remaining > 0:
+        days = cooldown_remaining // 86400
+        hours = (cooldown_remaining % 86400) // 3600
+        mins = (cooldown_remaining % 3600) // 60
+        if days > 0:
+            wait = f"{days}d {hours}h {mins}m"
+        elif hours > 0:
+            wait = f"{hours}h {mins}m"
+        else:
+            wait = f"{mins}m"
+        update.message.reply_text(
+            f"⏳ You already claimed an account this week.\n"
+            f"Come back in <b>{wait}</b>.",
+            parse_mode="HTML"
+        )
+        return
+
+    account = pool_take()
+
+    if account is None:
+        update.message.reply_text(
+            "❌ No accounts are available right now. Check back later!"
+        )
+        return
+
+    display = safe_name(user)
+    given_append(account, display, uid)
+
+    account_claims[key] = now()
+    save_data()
+
+    msg = (
+        f"🎁 <b>Your Account</b>\n\n"
+        f"<code>{account}</code>\n\n"
+        f"⚠️ Keep this private — do not share it.\n"
+        f"You can claim again in 7 days."
+    )
+
+    sent_dm = False
+    try:
+        context.bot.send_message(
+            chat_id=uid,
+            text=msg,
+            parse_mode="HTML"
+        )
+        sent_dm = True
+    except Exception:
+        pass
+
+    if sent_dm:
+        update.message.reply_text(
+            f"✅ Account sent to your DMs, {display}!"
+        )
+    else:
+        update.message.reply_text(
+            msg,
+            parse_mode="HTML"
+        )
+
+
+# =========================================================
+# POOL STATUS  (/poolstatus) — admin only
+# =========================================================
+
+def poolstatus(update, context):
+
+    if not is_admin(update):
+        return
+
+    remaining = pool_count()
+
+    given_count = 0
+    if os.path.exists(ACCOUNTS_GIVEN_FILE):
+        with open(ACCOUNTS_GIVEN_FILE, "r", encoding="utf-8") as f:
+            given_count = sum(1 for line in f if line.strip())
+
+    update.message.reply_text(
+        f"📦 <b>Account Pool Status</b>\n\n"
+        f"✅ Available: <b>{remaining}</b>\n"
+        f"📤 Given out: <b>{given_count}</b>\n"
+        f"📋 Total users with claims: <b>{len(account_claims)}</b>",
+        parse_mode="HTML"
+    )
+
+
+# =========================================================
+# UPLOAD ACCOUNTS — admin sends a .txt document
+# =========================================================
+
+def handle_document(update, context):
+
+    if not is_admin(update):
+        return
+
+    doc = update.message.document
+
+    if not doc:
+        return
+
+    fname = doc.file_name or ""
+    if not fname.lower().endswith(".txt"):
+        return
+
+    try:
+        tg_file = context.bot.get_file(doc.file_id)
+        raw = tg_file.download_as_bytearray()
+        text = raw.decode("utf-8", errors="replace")
+    except Exception as e:
+        update.message.reply_text(f"❌ Failed to download file: {e}")
+        return
+
+    lines = text.splitlines()
+    added = pool_add_lines(lines)
+
+    if added == 0:
+        update.message.reply_text("⚠️ File had no valid lines to add.")
+        return
+
+    total = pool_count()
+    update.message.reply_text(
+        f"✅ Added <b>{added}</b> account(s) to the pool.\n"
+        f"📦 Pool now has <b>{total}</b> account(s) available.",
+        parse_mode="HTML"
+    )
+
 
 # =========================================================
 # FLASH GIVEAWAY  (/flashgiveaway [prize text])
@@ -3696,6 +3897,24 @@ dp.add_handler(
 )
 
 # =========================================================
+# ACCOUNT COMMANDS
+# =========================================================
+
+dp.add_handler(
+    CommandHandler(
+        "getaccount",
+        getaccount
+    )
+)
+
+dp.add_handler(
+    CommandHandler(
+        "poolstatus",
+        poolstatus
+    )
+)
+
+# =========================================================
 # GIVEAWAY COMMANDS
 # =========================================================
 
@@ -4201,6 +4420,17 @@ dp.add_handler(
         tap_button,
         pattern="tap_button",
         run_async=True,
+    )
+)
+
+# =========================================================
+# DOCUMENT HANDLER (admin account upload)
+# =========================================================
+
+dp.add_handler(
+    MessageHandler(
+        Filters.document,
+        handle_document
     )
 )
 
