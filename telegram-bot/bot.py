@@ -1800,16 +1800,27 @@ def invite(update, context):
     link = f"https://t.me/{bot_username}?start=inv_{uid}"
     display = safe_name(user)
 
-    update.message.reply_text(
+    msg = (
         f"🔗 <b>Your Invite Link</b>\n\n"
         f"Share this with someone who has <b>never joined {ANNOUNCE_CHANNEL}</b>:\n\n"
         f"<code>{link}</code>\n\n"
         f"When they join the channel and run /claimbonus:\n"
         f"• They get <b>{INVITE_RECEIVER_ACCOUNTS} free accounts</b>\n"
         f"• You get <b>{INVITE_SENDER_ACCOUNTS} free accounts</b>\n\n"
-        f"⚠️ Only works for new members of {ANNOUNCE_CHANNEL}. One bonus per person.",
-        parse_mode="HTML",
+        f"⚠️ Only works for new members of {ANNOUNCE_CHANNEL}. One bonus per person."
     )
+
+    try:
+        context.bot.send_message(chat_id=uid, text=msg, parse_mode="HTML")
+        # Only reply in-chat if the command was used outside a private chat
+        if update.effective_chat.type != "private":
+            update.message.reply_text("✅ Your invite link has been sent to your DMs!")
+    except Exception:
+        update.message.reply_text(
+            f"⚠️ I couldn't DM you your invite link.\n\n"
+            f"Open @{bot_username} and press <b>Start</b>, then run /invite again.",
+            parse_mode="HTML",
+        )
 
 
 def inviteinfo(update, context):
