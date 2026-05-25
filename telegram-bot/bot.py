@@ -1675,24 +1675,28 @@ def getaccount(update, context):
         f"You can claim again in 7 days."
     )
 
-    sent_dm = False
     try:
         context.bot.send_message(
             chat_id=uid,
             text=msg,
             parse_mode="HTML"
         )
-        sent_dm = True
-    except Exception:
-        pass
-
-    if sent_dm:
         update.message.reply_text(
             f"✅ Account sent to your DMs, {display}!"
         )
-    else:
+    except Exception:
+        # DM failed — reverse the claim so the account is not lost
+        pool_add_lines([account])
+        del account_claims[key]
+        save_data()
+
         update.message.reply_text(
-            msg,
+            f"⚠️ {display}, I couldn't send you a DM.\n\n"
+            f"To receive your account privately:\n"
+            f"1️⃣ Open @{context.bot.username} in Telegram\n"
+            f"2️⃣ Press <b>Start</b> to open a chat with the bot\n"
+            f"3️⃣ Come back here and run /getaccount again\n\n"
+            f"Your slot has been released — no account was given out.",
             parse_mode="HTML"
         )
 
