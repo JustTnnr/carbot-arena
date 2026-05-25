@@ -1089,6 +1089,42 @@ f"""
 """
     )
 
+def help_cmd(update, context):
+    border = random.choice(animated_borders)
+    update.message.reply_text(
+        f"{border}\n"
+        f"📖 BOT COMMAND GUIDE\n"
+        f"{border}\n\n"
+        f"🌐 GENERAL\n"
+        f"{'─'*18}\n"
+        f"/start — Start the bot\n"
+        f"/ping — Check if bot is online\n"
+        f"/profile — View your stats\n"
+        f"/leaderboard — Top players\n"
+        f"/help — Show this message\n\n"
+        f"{border}\n\n"
+        f"🎁 ACCOUNT COMMANDS\n"
+        f"{'─'*18}\n"
+        f"/getaccount — Claim a free account\n"
+        f"  (12hr cooldown · 1 account)\n\n"
+        f"/poolstatus — See how many accounts\n"
+        f"  are left in the pool\n\n"
+        f"/invite — Get your personal invite link\n"
+        f"  (sent to your DMs)\n\n"
+        f"/claimbonus — Claim your invite reward\n"
+        f"  after joining via someone's link\n"
+        f"  → You get 5 accounts\n"
+        f"  → They get 5 accounts\n\n"
+        f"{border}\n\n"
+        f"⚙️ OTHER COMMANDS\n"
+        f"{'─'*18}\n"
+        f"All other commands visible in this chat\n"
+        f"are activated by admins only.\n\n"
+        f"{border}",
+        parse_mode=None,
+    )
+
+
 def ping(update, context):
     t_start = time.time()
 
@@ -4252,6 +4288,13 @@ dp.add_handler(
     CommandHandler(
         "start",
         start
+    )
+)
+
+dp.add_handler(
+    CommandHandler(
+        "help",
+        help_cmd
     )
 )
 
