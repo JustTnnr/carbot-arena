@@ -4196,7 +4196,7 @@ def webraid(update, context):
             "chatId": ANNOUNCE_CHANNEL,
             "lobbyDurationMs": 0,
             "playDurationMs": 60000,
-            "bossHp": 30000,
+            "bossHp": 15000,
         })
     except Exception as e:
         update.message.reply_text(f"❌ Could not create session: {e}")
@@ -4212,7 +4212,7 @@ def webraid(update, context):
         "🏆 Winner = team with the <b>highest average damage per player</b>\n"
         "   (so a solo player can still beat a full team!)\n"
         "🐢 One tap every 0.3s max — no spamming\n\n"
-        f"❤️ Boss HP: 30,000\n\n"
+        f"❤️ Boss HP: 15,000\n\n"
         f"🔗 <a href=\"{url}\">JOIN TEAM RAID</a>"
     )
     keyboard = InlineKeyboardMarkup([[
