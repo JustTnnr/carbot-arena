@@ -1693,8 +1693,8 @@ def getaccount(update, context):
         update.message.reply_text(
             f"⚠️ {display}, I couldn't send you a DM.\n\n"
             f"To receive your account privately:\n"
-            f"1️⃣ Open @{context.bot.username} in Telegram\n"
-            f"2️⃣ Press <b>Start</b> to open a chat with the bot\n"
+            f"1️⃣ Open @{context.bot.username} in Telegram and press <b>Start</b>\n"
+            f"2️⃣ If it still fails, go to <b>Telegram Settings → Privacy and Security → Messages</b> and set it to <b>Everybody</b>\n"
             f"3️⃣ Come back here and run /getaccount again\n\n"
             f"Your slot has been released — no account was given out.",
             parse_mode="HTML"
