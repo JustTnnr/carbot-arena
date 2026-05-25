@@ -1585,22 +1585,94 @@ def update_event(
 # CLAIM NOTE HELPER
 # =========================================================
 
+def _dm_success_note():
+    """Short confirmation block used in group chat when a prize DM was delivered."""
+    border = random.choice(animated_borders)
+    return (
+        f"{border}\n"
+        f"✅ ACCOUNT DELIVERED\n"
+        f"{border}\n\n"
+        f"Your account has been sent\n"
+        f"directly to your Telegram DMs.\n\n"
+        f"Check your messages now!\n\n"
+        f"⚠️ Keep it private — do not share.\n\n"
+        f"{border}"
+    )
+
+
+def _dm_fail_note():
+    """Full explanation block used in group chat when a prize DM failed."""
+    border = random.choice(animated_borders)
+    return (
+        f"{border}\n"
+        f"⚠️ DM COULD NOT BE SENT\n"
+        f"{border}\n\n"
+        f"The bot tried to send your account\n"
+        f"but could not reach you.\n\n"
+        f"YOUR PRIZE IS SAVED — not lost.\n"
+        f"It will auto-deliver the moment\n"
+        f"the issue below is fixed.\n\n"
+        f"{'─'*20}\n"
+        f"POSSIBLE REASONS:\n"
+        f"{'─'*20}\n\n"
+        f"1️⃣ You haven't started the bot\n"
+        f"   Bots cannot DM you first unless\n"
+        f"   you've pressed Start in a DM.\n\n"
+        f"2️⃣ Privacy settings block bots\n"
+        f"   Telegram Settings → Privacy &\n"
+        f"   Security → Messages → set to\n"
+        f"   Everyone.\n\n"
+        f"3️⃣ You have blocked the bot\n"
+        f"   Unblock it to receive messages.\n\n"
+        f"4️⃣ Your account has restrictions\n"
+        f"   Telegram may have limited your\n"
+        f"   account from receiving DMs.\n\n"
+        f"{'─'*20}\n"
+        f"HOW TO FIX IT:\n"
+        f"{'─'*20}\n\n"
+        f"1️⃣ Open the bot in Telegram\n"
+        f"   and press START\n"
+        f"2️⃣ Fix your privacy settings\n"
+        f"3️⃣ Send any message in the group\n"
+        f"   — your prize auto-sends after.\n\n"
+        f"The admin will also try to find\n"
+        f"you by name. If they can't locate\n"
+        f"you, the steps above are the only\n"
+        f"way to receive your account.\n\n"
+        f"{border}"
+    )
+
+
 def _claim_note(user_obj):
-    """Return a formatted claim-instructions block for a giveaway winner."""
+    """Giveaway claim block — admin will search winner; explains what to do if unreachable."""
     border = random.choice(animated_borders)
     has_username = user_obj and getattr(user_obj, "username", None)
+    display = safe_name(user_obj) if user_obj else "Winner"
+
     if has_username:
         uname = f"@{user_obj.username}"
         return (
             f"{border}\n"
             f"📨 CLAIM INSTRUCTIONS\n"
             f"{border}\n\n"
-            f"✅ WINNER FOUND AS:\n"
+            f"✅ WINNER IDENTIFIED AS:\n"
             f"{uname}\n\n"
             f"The admin will DM you shortly.\n\n"
-            f"If you haven't heard back after\n"
-            f"a while, message the admin directly\n"
-            f"from the group chat.\n\n"
+            f"{'─'*20}\n"
+            f"IF YOU DON'T RECEIVE IT:\n"
+            f"{'─'*20}\n\n"
+            f"POSSIBLE REASONS:\n"
+            f"1️⃣ Your DMs are closed to bots\n"
+            f"   Settings → Privacy & Security\n"
+            f"   → Messages → Everyone\n\n"
+            f"2️⃣ You have blocked the admin\n"
+            f"   Unblock them to receive DMs.\n\n"
+            f"3️⃣ Your account has restrictions\n"
+            f"   limiting incoming messages.\n\n"
+            f"HOW TO CLAIM IF UNREACHABLE:\n"
+            f"Message the admin directly\n"
+            f"from the group chat — tell them\n"
+            f"you won and show this message.\n\n"
             f"{border}"
         )
     else:
@@ -1608,16 +1680,35 @@ def _claim_note(user_obj):
             f"{border}\n"
             f"⚠️ CLAIM INSTRUCTIONS\n"
             f"{border}\n\n"
-            f"🔍 NO USERNAME DETECTED\n\n"
-            f"The admin cannot find you by\n"
-            f"searching — it is up to YOU\n"
-            f"to claim your prize.\n\n"
-            f"STEPS TO CLAIM:\n"
-            f"1️⃣ Go to the group chat\n"
-            f"2️⃣ Find an admin and DM them\n"
-            f"3️⃣ Tell them you won and your name\n\n"
-            f"Do this ASAP or your prize\n"
-            f"may be forfeited.\n\n"
+            f"🔍 NO @USERNAME DETECTED\n\n"
+            f"The admin will try to find you\n"
+            f"by the name you used:\n"
+            f"{display}\n\n"
+            f"If the admin CANNOT find you —\n"
+            f"IT IS UP TO YOU TO CLAIM.\n\n"
+            f"{'─'*20}\n"
+            f"WHY THE ADMIN MAY NOT FIND YOU:\n"
+            f"{'─'*20}\n\n"
+            f"1️⃣ You have no @username set\n"
+            f"   Admins can only search by\n"
+            f"   username, not by display name.\n\n"
+            f"2️⃣ Your profile is private\n"
+            f"   Hidden profiles cannot be\n"
+            f"   found via search.\n\n"
+            f"3️⃣ You are not visible in the group\n"
+            f"   Send a message so admins\n"
+            f"   can see your account.\n\n"
+            f"{'─'*20}\n"
+            f"HOW TO CLAIM:\n"
+            f"{'─'*20}\n\n"
+            f"1️⃣ Set a @username in Telegram\n"
+            f"   Settings → Username\n"
+            f"2️⃣ Message an admin in the group\n"
+            f"   and tell them you won\n"
+            f"3️⃣ OR message the bot directly\n"
+            f"   — your prize auto-delivers\n\n"
+            f"Act fast — unclaimed prizes may\n"
+            f"be given to the next player.\n\n"
             f"{border}"
         )
 
@@ -2808,12 +2899,6 @@ def check_answer(update, context):
                 "🎲 MIX QUIZ ROUND WIN"
             )
 
-            dm_note = (
-                "✅ Account sent to your DMs!"
-                if sent else
-                "⚠️ Start a DM with the bot to receive your account."
-            )
-
             update.message.reply_text(
 f"""
 {border}
@@ -2833,11 +2918,12 @@ f"""
 🎁 +1 ACCOUNT
 
 {border}
-
-{dm_note}
-
-{border}
 """
+            )
+
+            update.message.reply_text(
+                _dm_success_note() if sent else _dm_fail_note(),
+                parse_mode=None,
             )
 
         # =================================================
@@ -2864,12 +2950,6 @@ f"""
                 "🚗 QUIZ WIN"
             )
 
-            dm_note = (
-                "✅ Account sent to your DMs!"
-                if sent else
-                "⚠️ Start a DM with the bot to receive your account."
-            )
-
             update.message.reply_text(
 f"""
 {border}
@@ -2889,11 +2969,12 @@ f"""
 1 ACCOUNT
 
 {border}
-
-{dm_note}
-
-{border}
 """
+            )
+
+            update.message.reply_text(
+                _dm_success_note() if sent else _dm_fail_note(),
+                parse_mode=None,
             )
 
         del quiz_data[chat_id]
