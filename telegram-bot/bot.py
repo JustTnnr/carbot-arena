@@ -1699,7 +1699,7 @@ def getaccount(update, context):
         else:
             wait = f"{mins}m"
         update.message.reply_text(
-            f"⏳ You already claimed an account this week.\n"
+            f"⏳ You already claimed an account this hour.\n"
             f"Come back in <b>{wait}</b>.",
             parse_mode="HTML"
         )
