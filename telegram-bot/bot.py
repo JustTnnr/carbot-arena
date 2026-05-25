@@ -5082,47 +5082,25 @@ def _poll_web_session(bot_instance, session_id, game_label, started_at=None, tim
             # Single winner (tap, quiz, raid)
             winner = data.get("winner")
             if winner:
-                print(f"[POLL] winner raw: {winner}")
-                uid = _resolve_tg_id(winner.get("telegramId"), winner.get("telegramUsername"))
-                print(f"[POLL] resolved uid={uid}")
-                if uid:
-                    name = winner.get("name") or winner.get("telegramUsername") or str(uid)
-                    sent = dm_prize_account(bot_instance, uid, name, f"🌐 {game_label}")
-                    print(f"[POLL] dm_prize_account → sent={sent}")
-                    winner_names.append((name, sent))
-                else:
-                    print(f"[POLL] could not resolve uid for winner={winner}")
+                name = winner.get("name") or winner.get("telegramUsername") or str(winner.get("telegramId", "?"))
+                winner_names.append(name)
 
-            # Team-raid: DM every member of the winning team
+            # Team-raid: collect every member of the winning team
             for member in (data.get("winnerTeamMembers") or []):
-                uid = _resolve_tg_id(member.get("telegramId"), member.get("telegramUsername"))
-                if uid:
-                    name = member.get("name") or member.get("telegramUsername") or str(uid)
-                    sent = dm_prize_account(bot_instance, uid, name, f"🌐 {game_label}")
-                    print(f"[POLL] team member uid={uid} → sent={sent}")
-                    winner_names.append((name, sent))
-                else:
-                    print(f"[POLL] could not resolve uid for member={member}")
+                name = member.get("name") or member.get("telegramUsername") or str(member.get("telegramId", "?"))
+                winner_names.append(name)
 
             # Post winner announcement to channel
             if winner_names:
                 try:
-                    lines = []
-                    for name, sent in winner_names:
-                        status_icon = "✅" if sent else "⚠️"
-                        lines.append(f"{status_icon} {name}")
+                    lines = [f"🏆 {name}" for name in winner_names]
                     bot_instance.send_message(
                         ANNOUNCE_CHANNEL,
                         f"{border}\n"
                         f"🏆 {game_label} WINNER(S) 🏆\n"
                         f"{border}\n\n"
                         + "\n".join(lines) + "\n\n"
-                        + "🎁 Account sent to your DMs!\n\n"
-                        + (
-                            "⚠️ If you didn't receive it, check\n"
-                            "the bot's instructions in your DMs.\n\n"
-                            if any(not s for _, s in winner_names) else ""
-                        )
+                        + "🎁 Admin will send your account shortly!\n\n"
                         + f"{border}",
                         parse_mode=None,
                     )
