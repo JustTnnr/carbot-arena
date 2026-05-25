@@ -2667,6 +2667,8 @@ f"""
 
 def carquiz(update, context):
 
+    if not is_admin(update):
+        return
     threading.Thread(
         target=ask_quiz,
         args=(
@@ -2680,6 +2682,8 @@ def carquiz(update, context):
 
 def mathquiz(update, context):
 
+    if not is_admin(update):
+        return
     threading.Thread(
         target=ask_quiz,
         args=(
@@ -2693,6 +2697,8 @@ def mathquiz(update, context):
 
 def puzzle(update, context):
 
+    if not is_admin(update):
+        return
     threading.Thread(
         target=ask_quiz,
         args=(
@@ -2706,6 +2712,8 @@ def puzzle(update, context):
 
 def carlogo(update, context):
 
+    if not is_admin(update):
+        return
     threading.Thread(
         target=ask_quiz,
         args=(
@@ -2723,12 +2731,11 @@ def carlogo(update, context):
 
 def taprace(update, context):
 
+    if not is_admin(update):
+        return
     global tournament_players
 
     border = random.choice(animated_borders)
-
-    if not is_admin(update):
-        return
 
     tournament_players = []
 
@@ -3446,12 +3453,11 @@ def reset_tournament():
 
 def stoptap(update, context):
 
+    if not is_admin(update):
+        return
     global match_running
 
     border = random.choice(animated_borders)
-
-    if not is_admin(update):
-        return
 
     if not match_running:
 
@@ -3484,6 +3490,8 @@ f"""
 
 def players(update, context):
 
+    if not is_admin(update):
+        return
     border = random.choice(animated_borders)
 
     if not tournament_players:
@@ -3535,6 +3543,8 @@ f"""
 
 def tapstatus(update, context):
 
+    if not is_admin(update):
+        return
     border = random.choice(animated_borders)
 
     if match_running:
@@ -3592,11 +3602,10 @@ raid_cooldown = {}
 
 def start_boss_raid(update, context):
 
-    global boss_raid
-    global raid_active
-
     if not is_admin(update):
         return
+    global boss_raid
+    global raid_active
 
     if raid_active:
 
