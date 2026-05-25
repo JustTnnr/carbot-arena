@@ -1712,6 +1712,44 @@ def getaccount(update, context):
         )
         return
 
+    display = safe_name(user)
+
+    if unlimited_mode:
+        count = random.randint(1, 10)
+        accounts = [a for a in (pool_take() for _ in range(count)) if a]
+        if not accounts:
+            update.message.reply_text("❌ No accounts are available right now. Check back later!")
+            return
+
+        for acc in accounts:
+            given_append(acc, display, uid)
+        account_claims[key] = now()
+        save_data()
+
+        dm_text = f"🎁 <b>You got {len(accounts)} account(s)!</b>\n\n"
+        for acc in accounts:
+            dm_text += f"<code>{acc}</code>\n"
+        dm_text += "\n⚠️ Keep these private — do not share them."
+
+        try:
+            context.bot.send_message(chat_id=uid, text=dm_text, parse_mode="HTML")
+            update.message.reply_text(
+                f"🎉 <b>{display}</b> just scored <b>{len(accounts)} account(s)</b>! "
+                f"Check your DMs 🔥",
+                parse_mode="HTML"
+            )
+        except Exception:
+            pool_add_lines(accounts)
+            for acc in accounts:
+                pass  # already appended to log; acceptable in unlimited events
+            del account_claims[key]
+            save_data()
+            update.message.reply_text(
+                f"⚠️ {display}, I couldn't DM you. Open @{context.bot.username} and press Start, then try again.",
+                parse_mode="HTML"
+            )
+        return
+
     account = pool_take()
 
     if account is None:
@@ -1720,7 +1758,6 @@ def getaccount(update, context):
         )
         return
 
-    display = safe_name(user)
     given_append(account, display, uid)
 
     account_claims[key] = now()
@@ -1730,7 +1767,7 @@ def getaccount(update, context):
         f"🎁 <b>Your Account</b>\n\n"
         f"<code>{account}</code>\n\n"
         f"⚠️ Keep this private — do not share it.\n"
-        f"You can claim again in 1 hour."
+        f"You can claim again in 10 seconds."
     )
 
     try:
