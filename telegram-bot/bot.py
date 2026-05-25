@@ -320,7 +320,8 @@ total_games = {}
 
 events = {
     "giveaway": None,
-    "premium": None
+    "premium": None,
+    "flash": None,
 }
 
 quiz_data = {}
@@ -1128,7 +1129,8 @@ def timer_loop(bot):
 
             for key in [
                 "giveaway",
-                "premium"
+                "premium",
+                "flash",
             ]:
 
                 ev = events.get(key)
@@ -1237,6 +1239,16 @@ def update_event(
         callback = "join_giveaway"
 
         winner_text = "👑 GIVEAWAY WINNER : 1"
+
+    elif key == "flash":
+
+        button_text = (
+            f"⚡ ENTER FLASH GIVEAWAY ({total})"
+        )
+
+        callback = "join_flash"
+
+        winner_text = "🏆 FLASH WINNER : 1"
 
     else:
 
@@ -1412,6 +1424,75 @@ f"""
             )
 
     # =====================================================
+    # FLASH GIVEAWAY
+    # =====================================================
+
+    elif key == "flash":
+
+        if ev["players"]:
+
+            winner_id = random.choice(ev["players"])
+
+            try:
+                user = bot.get_chat(winner_id)
+                record_name(winner_id, user)
+                name = user.first_name or "Unknown"
+                username = f"@{user.username}" if user.username else name
+                mention = f"{name} ({username})" if user.username else name
+            except Exception:
+                mention = player_names.get(str(winner_id), str(winner_id))
+
+            leaderboard[winner_id] = leaderboard.get(winner_id, 0) + 1
+
+            save_data()
+
+            bot.send_message(
+                ANNOUNCE_CHANNEL,
+f"""
+{border}
+⚡ FLASH GIVEAWAY RESULTS ⚡
+{border}
+
+🎉 CONGRATULATIONS! 🎉
+
+🏆 WINNER:
+{mention}
+
+{border}
+
+🎁 PRIZE:
+{ev['prize']}
+
+{border}
+
+👥 TOTAL ENTRIES:
+{len(ev['players'])}
+
+{border}
+
+🤝 DM THE ADMIN TO CLAIM YOUR REWARD 🤝
+
+{border}
+""",
+                parse_mode=None
+            )
+
+        else:
+
+            bot.send_message(
+                ANNOUNCE_CHANNEL,
+f"""
+{border}
+⚡ FLASH GIVEAWAY ENDED
+{border}
+
+❌ NO ONE ENTERED — NO WINNER
+
+{border}
+"""
+            )
+
+    # =====================================================
     # NORMAL GIVEAWAY
     # =====================================================
 
@@ -1480,6 +1561,117 @@ f"""
     events[key] = None
 
     save_data()
+
+# =========================================================
+# FLASH GIVEAWAY  (/flashgiveaway [prize text])
+# =========================================================
+
+def flashgiveaway(update, context):
+
+    if not is_admin(update):
+        return
+
+    if events.get("flash"):
+        update.message.reply_text("⚡ A flash giveaway is already running!")
+        return
+
+    prize = " ".join(context.args).strip() if context.args else "SURPRISE PRIZE 🎁"
+
+    duration = 600  # 10 minutes
+
+    ev = {
+        "title": "⚡ FLASH GIVEAWAY",
+        "prize": prize,
+        "chat_id": ANNOUNCE_CHANNEL,
+        "message_id": None,
+        "players": [],
+        "start": now(),
+        "end": now() + duration,
+        "duration": duration,
+    }
+
+    border = random.choice(animated_borders)
+
+    keyboard = [[
+        InlineKeyboardButton(
+            "⚡ ENTER FLASH GIVEAWAY (0)",
+            callback_data="join_flash"
+        )
+    ]]
+
+    end_date = time.strftime(
+        "%Y-%m-%d %I:%M %p",
+        time.localtime(ev["end"])
+    )
+
+    try:
+        sent = context.bot.send_message(
+            ANNOUNCE_CHANNEL,
+f"""
+{border}
+⚡ FLASH GIVEAWAY ⚡
+{border}
+
+🎁 PRIZE:
+{prize}
+
+{border}
+
+🏆 FLASH WINNER : 1
+
+{border}
+
+👥 PLAYERS:
+0
+
+{border}
+
+⌛ TIME LEFT:
+10:00
+
+{border}
+
+🏁 ENDS:
+{end_date}
+
+{border}
+""",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+        ev["message_id"] = sent.message_id
+        events["flash"] = ev
+        save_data()
+
+        update.message.reply_text(
+            f"⚡ Flash giveaway started! Posted to {ANNOUNCE_CHANNEL}. Ends in 10 minutes."
+        )
+
+    except Exception as e:
+        update.message.reply_text(f"❌ Failed to post: {e}")
+
+
+def join_flash(update, context):
+
+    q = update.callback_query
+
+    uid = q.from_user.id
+
+    record_name(uid, q.from_user)
+
+    ev = events.get("flash")
+
+    if not ev:
+        q.answer("No flash giveaway active.")
+        return
+
+    if uid not in ev["players"]:
+        ev["players"].append(uid)
+        save_data()
+        q.answer("⚡ You're in the flash giveaway!")
+    else:
+        q.answer("Already entered!")
+
 
 # =========================================================
 # GIVEAWAY
@@ -3509,6 +3701,13 @@ dp.add_handler(
 
 dp.add_handler(
     CommandHandler(
+        "flashgiveaway",
+        flashgiveaway
+    )
+)
+
+dp.add_handler(
+    CommandHandler(
         "giveaway",
         giveaway
     )
@@ -3977,6 +4176,14 @@ dp.add_handler(
     CallbackQueryHandler(
         join_premium,
         pattern="join_premium",
+        run_async=True,
+    )
+)
+
+dp.add_handler(
+    CallbackQueryHandler(
+        join_flash,
+        pattern="join_flash",
         run_async=True,
     )
 )
