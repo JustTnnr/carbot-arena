@@ -2855,24 +2855,17 @@ f"""
 # =========================================================
 
 def check_answer(update, context):
-
-    global mix_quiz_scores
-
-    try:
-        _check_answer_inner(update, context)
-    except Exception as exc:
-        import traceback
-        print(f"[check_answer ERROR] {exc}")
-        traceback.print_exc()
+    _check_answer_inner(update, context)
 
 
 def _check_answer_inner(update, context):
 
     global mix_quiz_scores
 
+    if not update.message or not update.message.text:
+        return
+
     chat_id = update.effective_chat.id
-    active = list(quiz_data.keys())
-    print(f"[check_answer] chat={chat_id} active_quizzes={active} text={update.message.text!r:.40}")
 
     border = random.choice(animated_borders)
 
@@ -2880,7 +2873,6 @@ def _check_answer_inner(update, context):
         return
 
     if now() > quiz_data[chat_id]["end"]:
-        print(f"[check_answer] quiz expired for chat={chat_id}")
         return
 
     answer = (
@@ -2894,8 +2886,6 @@ def _check_answer_inner(update, context):
     if answer == correct:
 
         user = update.message.from_user
-
-        print(f"[QUIZ] Correct answer from uid={user.id} in chat={chat_id} mix={quiz_data[chat_id].get('mix')}")
 
         total_games[user.id] = (
             total_games.get(user.id, 0) + 1
