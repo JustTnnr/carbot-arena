@@ -1813,8 +1813,10 @@ def invite(update, context):
 
 
 def inviteinfo(update, context):
+    if not is_admin(update):
+        return
     border = random.choice(animated_borders)
-    update.message.reply_text(
+    text = (
         f"{border}\n"
         f"🔗 INVITE & EARN FREE ACCOUNTS\n"
         f"{border}\n\n"
@@ -1839,9 +1841,14 @@ def inviteinfo(update, context):
         f"✅ You cannot use your own invite link\n"
         f"✅ Accounts are sent privately to your DMs\n\n"
         f"{border}\n"
-        f"▶️ Ready? Run /invite to get your link!\n"
-        f"{border}",
+        f"▶️ Ready? Run /invite in the bot to get your link!\n"
+        f"{border}"
     )
+    try:
+        context.bot.send_message(ANNOUNCE_CHANNEL, text)
+        update.message.reply_text(f"✅ Invite info posted to {ANNOUNCE_CHANNEL}.")
+    except Exception as e:
+        update.message.reply_text(f"❌ Couldn't post to {ANNOUNCE_CHANNEL}: {e}")
 
 
 def claimbonus(update, context):
