@@ -1692,12 +1692,15 @@ def getaccount(update, context):
         days = cooldown_remaining // 86400
         hours = (cooldown_remaining % 86400) // 3600
         mins = (cooldown_remaining % 3600) // 60
+        secs = cooldown_remaining % 60
         if days > 0:
             wait = f"{days}d {hours}h {mins}m"
         elif hours > 0:
             wait = f"{hours}h {mins}m"
+        elif mins > 0:
+            wait = f"{mins}m {secs}s"
         else:
-            wait = f"{mins}m"
+            wait = f"{secs}s"
         update.message.reply_text(
             f"⏳ You already claimed an account this hour.\n"
             f"Come back in <b>{wait}</b>.",
