@@ -1582,6 +1582,46 @@ def update_event(
         pass
 
 # =========================================================
+# CLAIM NOTE HELPER
+# =========================================================
+
+def _claim_note(user_obj):
+    """Return a formatted claim-instructions block for a giveaway winner."""
+    border = random.choice(animated_borders)
+    has_username = user_obj and getattr(user_obj, "username", None)
+    if has_username:
+        uname = f"@{user_obj.username}"
+        return (
+            f"{border}\n"
+            f"📨 CLAIM INSTRUCTIONS\n"
+            f"{border}\n\n"
+            f"✅ WINNER FOUND AS:\n"
+            f"{uname}\n\n"
+            f"The admin will DM you shortly.\n\n"
+            f"If you haven't heard back after\n"
+            f"a while, message the admin directly\n"
+            f"from the group chat.\n\n"
+            f"{border}"
+        )
+    else:
+        return (
+            f"{border}\n"
+            f"⚠️ CLAIM INSTRUCTIONS\n"
+            f"{border}\n\n"
+            f"🔍 NO USERNAME DETECTED\n\n"
+            f"The admin cannot find you by\n"
+            f"searching — it is up to YOU\n"
+            f"to claim your prize.\n\n"
+            f"STEPS TO CLAIM:\n"
+            f"1️⃣ Go to the group chat\n"
+            f"2️⃣ Find an admin and DM them\n"
+            f"3️⃣ Tell them you won and your name\n\n"
+            f"Do this ASAP or your prize\n"
+            f"may be forfeited.\n\n"
+            f"{border}"
+        )
+
+# =========================================================
 # FINISH EVENT
 # =========================================================
 
@@ -1660,10 +1700,6 @@ def finish_event(
 {len(ev['players'])}
 
 {border}
-
-🤝DM THE ADMIN FOR YOUR REWARD BRO🤝
-
-{border}
 """
 
             save_data()
@@ -1672,6 +1708,18 @@ def finish_event(
                 ev["chat_id"],
                 text
             )
+
+            # Send individual claim instructions for each winner
+            for uid in winners:
+                try:
+                    winner_user = bot.get_chat(uid)
+                    bot.send_message(
+                        ev["chat_id"],
+                        _claim_note(winner_user),
+                        parse_mode=None,
+                    )
+                except Exception:
+                    pass
 
         else:
 
@@ -1730,12 +1778,19 @@ f"""
 {len(ev['players'])}
 
 {border}
-
-🤝 DM THE ADMIN TO CLAIM YOUR REWARD 🤝
-
-{border}
 """,
                 parse_mode=None
+            )
+
+            try:
+                flash_winner_user = bot.get_chat(winner_id)
+            except Exception:
+                flash_winner_user = None
+
+            bot.send_message(
+                ANNOUNCE_CHANNEL,
+                _claim_note(flash_winner_user),
+                parse_mode=None,
             )
 
         else:
@@ -1801,11 +1856,13 @@ f"""
 {len(ev['players'])}
 
 {border}
-
-🤝DM THE ADMIN FOR YOUR REWARD BRO🤝
-
-{border}
 """
+            )
+
+            bot.send_message(
+                ev["chat_id"],
+                _claim_note(user),
+                parse_mode=None,
             )
 
         else:
