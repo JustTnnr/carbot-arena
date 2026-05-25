@@ -1812,6 +1812,38 @@ def invite(update, context):
     )
 
 
+def inviteinfo(update, context):
+    border = random.choice(animated_borders)
+    update.message.reply_text(
+        f"{border}\n"
+        f"🔗 INVITE & EARN FREE ACCOUNTS\n"
+        f"{border}\n\n"
+        f"Want free accounts? Invite your friends!\n\n"
+        f"{border}\n"
+        f"📲 HOW IT WORKS\n"
+        f"{border}\n\n"
+        f"1️⃣ Run /invite to get your personal invite link\n\n"
+        f"2️⃣ Share the link with someone who has never joined {ANNOUNCE_CHANNEL}\n\n"
+        f"3️⃣ They click your link, join {ANNOUNCE_CHANNEL}, then run /claimbonus\n\n"
+        f"4️⃣ Both of you get rewarded instantly!\n\n"
+        f"{border}\n"
+        f"🎁 REWARDS\n"
+        f"{border}\n\n"
+        f"👤 New member gets → {INVITE_RECEIVER_ACCOUNTS} FREE accounts\n"
+        f"🤝 You (the inviter) get → {INVITE_SENDER_ACCOUNTS} FREE accounts\n\n"
+        f"{border}\n"
+        f"⚠️ RULES\n"
+        f"{border}\n\n"
+        f"✅ The person you invite must be NEW to {ANNOUNCE_CHANNEL}\n"
+        f"✅ Each person can only claim the invite bonus once\n"
+        f"✅ You cannot use your own invite link\n"
+        f"✅ Accounts are sent privately to your DMs\n\n"
+        f"{border}\n"
+        f"▶️ Ready? Run /invite to get your link!\n"
+        f"{border}",
+    )
+
+
 def claimbonus(update, context):
     user    = update.effective_user
     uid     = user.id
@@ -4127,6 +4159,13 @@ dp.add_handler(
     CommandHandler(
         "invite",
         invite
+    )
+)
+
+dp.add_handler(
+    CommandHandler(
+        "inviteinfo",
+        inviteinfo
     )
 )
 
