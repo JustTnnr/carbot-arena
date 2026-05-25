@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "r3NQsO_B89pWrLH-2NDBB"
+uri = "file://telegram-bot/accounts_given.txt"
+type = "text"
+title = "Accounts Given Log"
