@@ -2906,13 +2906,6 @@ def _check_answer_inner(update, context):
 
             record_name(user.id, user)
 
-            sent = dm_prize_account(
-                context.bot,
-                user.id,
-                safe_name(user),
-                "🎲 MIX QUIZ ROUND WIN"
-            )
-
             update.message.reply_text(
 f"""
 {border}
@@ -2929,15 +2922,10 @@ f"""
 {border}
 
 🏆 +1 POINT
-🎁 +1 ACCOUNT
+🎁 +1 ACCOUNT — admin will send it to you shortly
 
 {border}
 """
-            )
-
-            update.message.reply_text(
-                _dm_success_note() if sent else _dm_fail_note(),
-                parse_mode=None,
             )
 
         # =================================================
@@ -2957,13 +2945,6 @@ f"""
 
             save_data()
 
-            sent = dm_prize_account(
-                context.bot,
-                user.id,
-                safe_name(user),
-                "🚗 QUIZ WIN"
-            )
-
             update.message.reply_text(
 f"""
 {border}
@@ -2980,15 +2961,10 @@ f"""
 {border}
 
 🎁 WON:
-1 ACCOUNT
+1 ACCOUNT — admin will send it to you shortly
 
 {border}
 """
-            )
-
-            update.message.reply_text(
-                _dm_success_note() if sent else _dm_fail_note(),
-                parse_mode=None,
             )
 
         del quiz_data[chat_id]
