@@ -362,6 +362,13 @@ party_mode = False      # when True, users get 1-10 random accounts instead of 1
 
 account_claims = {}  # {str(user_id): timestamp}
 
+# Full user registry — persisted so the bot knows every user it has ever seen
+# {str(uid): {"uid": int, "first_name": str, "username": str|None}}
+user_registry: dict = {}
+
+# Reverse lookup: lowercase username (without @) → int uid
+username_to_uid: dict = {}
+
 # ── Invite system ─────────────────────────────────────────
 INVITE_RECEIVER_ACCOUNTS = 5   # accounts sent to the person who was invited
 INVITE_SENDER_ACCOUNTS   = 5   # accounts sent to the person who shared the link
@@ -389,6 +396,7 @@ def save_data():
         "account_claims": account_claims,
         "invite_pending": invite_pending,
         "invite_used": invite_used,
+        "user_registry": user_registry,
 
     }
 
@@ -396,8 +404,30 @@ def save_data():
 
         json.dump(data, f)
 
+def register_user(uid, user):
+    """Fully record a user: display name, full registry entry, and reverse username index."""
+    key = str(uid)
+    player_names[key] = safe_name(user)
+
+    username = None
+    if hasattr(user, "username") and user.username:
+        username = user.username.lstrip("@").lower()
+
+    first_name = ""
+    if hasattr(user, "first_name") and user.first_name:
+        first_name = user.first_name
+
+    user_registry[key] = {
+        "uid": int(uid),
+        "first_name": first_name,
+        "username": username,
+    }
+
+    if username:
+        username_to_uid[username] = int(uid)
+
 def record_name(uid, user):
-    player_names[str(uid)] = safe_name(user)
+    register_user(uid, user)
 
 # =========================================================
 # LOAD SYSTEM
@@ -459,6 +489,13 @@ def load_data():
         uid for uid in data.get("invite_used", [])
         if uid not in invite_used
     )
+
+    # Restore full user registry and rebuild reverse username index
+    for key, rec in data.get("user_registry", {}).items():
+        user_registry[key] = rec
+        uname = rec.get("username")
+        if uname:
+            username_to_uid[uname.lower()] = int(rec.get("uid", key))
 
 load_data()
 
@@ -4825,6 +4862,19 @@ def _get_session_winner(session_id):
         return None
 
 
+def _resolve_tg_id(tg_id, tg_username):
+    """Return a confirmed int uid or None.
+    Tries the supplied telegramId first; falls back to username registry lookup."""
+    if tg_id and isinstance(tg_id, (int, float)) and int(tg_id) > 0:
+        return int(tg_id)
+    if tg_username:
+        clean = tg_username.lstrip("@").lower()
+        found = username_to_uid.get(clean)
+        if found:
+            return found
+    return None
+
+
 def _poll_web_session(bot_instance, session_id, game_label, timeout=600):
     """Background thread: polls until the session finishes, then DMs winner(s) 1 account each."""
     deadline = time.time() + timeout
@@ -4833,23 +4883,29 @@ def _poll_web_session(bot_instance, session_id, game_label, timeout=600):
         data = _get_session_winner(session_id)
         if not data:
             continue
-        status = data.get("status")
-        if status != "finished":
+        if data.get("status") != "finished":
             continue
 
         # Single winner (tap, quiz, raid)
         winner = data.get("winner")
-        if winner and winner.get("telegramId"):
-            tg_id = winner["telegramId"]
-            name = winner.get("name") or winner.get("telegramUsername") or str(tg_id)
-            dm_prize_account(bot_instance, tg_id, name, f"🌐 {game_label}")
+        if winner:
+            uid = _resolve_tg_id(
+                winner.get("telegramId"),
+                winner.get("telegramUsername")
+            )
+            if uid:
+                name = winner.get("name") or winner.get("telegramUsername") or str(uid)
+                dm_prize_account(bot_instance, uid, name, f"🌐 {game_label}")
 
         # Team-raid: DM every member of the winning team
         for member in (data.get("winnerTeamMembers") or []):
-            tg_id = member.get("telegramId")
-            if tg_id:
-                name = member.get("name") or member.get("telegramUsername") or str(tg_id)
-                dm_prize_account(bot_instance, tg_id, name, f"🌐 {game_label}")
+            uid = _resolve_tg_id(
+                member.get("telegramId"),
+                member.get("telegramUsername")
+            )
+            if uid:
+                name = member.get("name") or member.get("telegramUsername") or str(uid)
+                dm_prize_account(bot_instance, uid, name, f"🌐 {game_label}")
 
         break  # done
 
@@ -5072,6 +5128,51 @@ dp.add_handler(
     MessageHandler(
         Filters.document,
         handle_document
+    )
+)
+
+# =========================================================
+# USER TRACKER (group -1 — fires for every message so we
+# always know every uid/username in the chat)
+# =========================================================
+
+_tracker_save_counter = 0
+
+def track_any_message(update, context):
+    """Record every user who sends any message — builds the uid/username registry."""
+    global _tracker_save_counter
+    user = update.effective_user
+    if user and not user.is_bot:
+        register_user(user.id, user)
+        _tracker_save_counter += 1
+        # Persist every 20 messages to avoid constant disk writes
+        if _tracker_save_counter >= 20:
+            save_data()
+            _tracker_save_counter = 0
+
+dp.add_handler(
+    MessageHandler(
+        Filters.all,
+        track_any_message
+    ),
+    group=-1
+)
+
+# =========================================================
+# NEW MEMBER TRACKER
+# =========================================================
+
+def track_new_members(update, context):
+    """Record all new members who join the group."""
+    for member in (update.message.new_chat_members or []):
+        if not member.is_bot:
+            register_user(member.id, member)
+    save_data()
+
+dp.add_handler(
+    MessageHandler(
+        Filters.status_update.new_chat_members,
+        track_new_members
     )
 )
 
