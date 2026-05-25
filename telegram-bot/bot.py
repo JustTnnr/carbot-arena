@@ -2023,11 +2023,11 @@ def extrafromchange(update, context):
         update.message.reply_text("ℹ️ No invite bonus receivers found in the log.")
         return
 
-    pool_count = len(pool_list())
+    available = pool_count()
     needed = len(affected_uids) * EXTRA
-    if pool_count < needed:
+    if available < needed:
         update.message.reply_text(
-            f"⚠️ Pool only has {pool_count} accounts but {needed} are needed "
+            f"⚠️ Pool only has {available} accounts but {needed} are needed "
             f"({len(affected_uids)} users × {EXTRA}). Add more accounts first."
         )
         return
