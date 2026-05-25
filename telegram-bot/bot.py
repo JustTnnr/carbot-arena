@@ -1862,8 +1862,12 @@ def claimbonus(update, context):
     inviter_key = invite_pending.get(key)
     if not inviter_key:
         update.message.reply_text(
-            "❌ No pending invite found for you.\n"
-            "You need to open an invite link from another user first, then run /claimbonus."
+            "❌ No pending invite found for you.\n\n"
+            "This can happen if:\n"
+            "• You haven't opened an invite link yet — ask someone for their /invite link\n"
+            "• The person who sent you the link hasn't joined the channel or started the bot yet\n"
+            "• Your invite was already used or expired\n\n"
+            "Once you have a valid invite link, click it and then run /claimbonus again."
         )
         return
 
