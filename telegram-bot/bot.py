@@ -360,7 +360,7 @@ ACCOUNT_COOLDOWN = 3600  # 1 hour in seconds
 account_claims = {}  # {str(user_id): timestamp}
 
 # ── Invite system ─────────────────────────────────────────
-INVITE_RECEIVER_ACCOUNTS = 2   # accounts sent to the person who was invited
+INVITE_RECEIVER_ACCOUNTS = 5   # accounts sent to the person who was invited
 INVITE_SENDER_ACCOUNTS   = 5   # accounts sent to the person who shared the link
 
 invite_pending = {}   # {str(invitee_uid): str(inviter_uid)} — awaiting /claimbonus
@@ -1983,6 +1983,101 @@ def claimbonus(update, context):
                 )
         except Exception:
             pass
+
+
+# =========================================================
+# EXTRA ACCOUNTS FOR OLD 2-ACCOUNT INVITE RECEIVERS
+# =========================================================
+
+def extrafromchange(update, context):
+    if not is_admin(update):
+        return
+
+    EXTRA = 3  # how many extra accounts to give each affected user
+
+    # Parse accounts_given.txt for UIDs that received an invite bonus
+    log_path = os.path.join(os.path.dirname(__file__), "accounts_given.txt")
+    try:
+        with open(log_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except Exception as e:
+        update.message.reply_text(f"❌ Couldn't read accounts log: {e}")
+        return
+
+    # Collect unique UIDs from lines tagged [invite bonus from ...]
+    affected_uids = {}  # uid (int) -> display name
+    for line in lines:
+        if "[invite bonus from" not in line:
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) < 3:
+            continue
+        try:
+            uid = int(parts[2])
+        except ValueError:
+            continue
+        display = parts[1] if len(parts) > 1 else str(uid)
+        affected_uids[uid] = display
+
+    if not affected_uids:
+        update.message.reply_text("ℹ️ No invite bonus receivers found in the log.")
+        return
+
+    pool_count = len(pool_list())
+    needed = len(affected_uids) * EXTRA
+    if pool_count < needed:
+        update.message.reply_text(
+            f"⚠️ Pool only has {pool_count} accounts but {needed} are needed "
+            f"({len(affected_uids)} users × {EXTRA}). Add more accounts first."
+        )
+        return
+
+    update.message.reply_text(
+        f"⏳ Sending {EXTRA} extra accounts to {len(affected_uids)} users…"
+    )
+
+    sent_ok = []
+    sent_fail = []
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    for uid, display in affected_uids.items():
+        accounts = [a for a in (pool_take() for _ in range(EXTRA)) if a]
+        if not accounts:
+            sent_fail.append(display)
+            continue
+
+        ok = _dm_accounts_batch(
+            context.bot, uid, accounts,
+            f"Bonus Top-Up — {len(accounts)} Extra Accounts"
+        )
+
+        # Log each account given
+        with open(log_path, "a", encoding="utf-8") as f:
+            for acc in accounts:
+                f.write(f"{acc} | {display} | {uid} | {ts} | [extrafromchange top-up]\n")
+
+        if ok:
+            sent_ok.append(display)
+            try:
+                context.bot.send_message(
+                    chat_id=uid,
+                    text=(
+                        f"🎁 <b>Bonus Top-Up!</b>\n\n"
+                        f"We updated the invite reward to <b>5 accounts each</b>. "
+                        f"Here are <b>{len(accounts)} extra accounts</b> to make up the difference — "
+                        f"check your DMs above!"
+                    ),
+                    parse_mode="HTML",
+                )
+            except Exception:
+                pass
+        else:
+            sent_fail.append(display)
+
+    summary = f"✅ Sent to {len(sent_ok)} users."
+    if sent_fail:
+        summary += f"\n⚠️ DM failed for {len(sent_fail)}: {', '.join(sent_fail)}"
+    update.message.reply_text(summary)
 
 
 # =========================================================
@@ -4195,6 +4290,13 @@ dp.add_handler(
     CommandHandler(
         "claimbonus",
         claimbonus
+    )
+)
+
+dp.add_handler(
+    CommandHandler(
+        "extrafromchange",
+        extrafromchange
     )
 )
 
