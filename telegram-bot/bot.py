@@ -1101,7 +1101,7 @@ def help_cmd(update, context):
         f"/ping — Check if bot is online\n"
         f"/profile — View your stats\n"
         f"/leaderboard — Top players\n"
-        f"/help — Show this message\n\n"
+        f"/info — Show this message\n\n"
         f"{border}\n\n"
         f"🎁 ACCOUNT COMMANDS\n"
         f"{'─'*18}\n"
@@ -4293,7 +4293,7 @@ dp.add_handler(
 
 dp.add_handler(
     CommandHandler(
-        "help",
+        "info",
         help_cmd
     )
 )
