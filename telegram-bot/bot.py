@@ -362,6 +362,10 @@ party_mode = False      # when True, users get 1-10 random accounts instead of 1
 
 account_claims = {}  # {str(user_id): timestamp}
 
+# Accounts won but not yet delivered (DM failed at the time)
+# {str(uid): [account_str, ...]}
+pending_prizes: dict = {}
+
 # Full user registry — persisted so the bot knows every user it has ever seen
 # {str(uid): {"uid": int, "first_name": str, "username": str|None}}
 user_registry: dict = {}
@@ -397,6 +401,7 @@ def save_data():
         "invite_pending": invite_pending,
         "invite_used": invite_used,
         "user_registry": user_registry,
+        "pending_prizes": pending_prizes,
 
     }
 
@@ -490,6 +495,10 @@ def load_data():
         if uid not in invite_used
     )
 
+    for key, prizes in data.get("pending_prizes", {}).items():
+        if prizes:
+            pending_prizes[key] = prizes
+
     # Restore full user registry and rebuild reverse username index
     for key, rec in data.get("user_registry", {}).items():
         user_registry[key] = rec
@@ -543,36 +552,63 @@ def pool_add_lines(lines):
                 f.write(line + "\n")
     return len(clean)
 
+def _send_account_dm(bot_instance, uid, account, label):
+    """Send a single account DM. Returns True on success."""
+    border = random.choice(animated_borders)
+    bot_instance.send_message(
+        chat_id=uid,
+        text=(
+            f"{border}\n"
+            f"🎁 YOU WON AN ACCOUNT!\n"
+            f"{border}\n\n"
+            f"🏆 REWARD:\n"
+            f"{label}\n\n"
+            f"{border}\n\n"
+            f"<code>{account}</code>\n\n"
+            f"{border}\n\n"
+            f"⚠️ Keep this private — do not share it.\n\n"
+            f"{border}"
+        ),
+        parse_mode="HTML"
+    )
+
+
+def deliver_pending_prizes(bot_instance, uid):
+    """Try to deliver any queued prizes to uid. Called whenever the user is known to be reachable."""
+    key = str(uid)
+    prizes = pending_prizes.get(key)
+    if not prizes:
+        return
+    delivered = []
+    for account in list(prizes):
+        try:
+            _send_account_dm(bot_instance, uid, account, "🎁 PENDING PRIZE")
+            delivered.append(account)
+        except Exception:
+            break  # still unreachable — stop and try next time
+    if delivered:
+        pending_prizes[key] = [a for a in prizes if a not in delivered]
+        if not pending_prizes[key]:
+            del pending_prizes[key]
+        save_data()
+
+
 def dm_prize_account(bot_instance, uid, display_name, label="🏆 GAME WIN"):
     """Take 1 account from pool and DM it to uid.
-    Returns True on success, False if pool empty or DM fails."""
+    If DM fails the account is queued in pending_prizes — not lost."""
     account = pool_take()
     if not account:
         return False
     given_append(account, display_name, uid)
     save_data()
-    border = random.choice(animated_borders)
     try:
-        bot_instance.send_message(
-            chat_id=uid,
-            text=(
-                f"{border}\n"
-                f"🎁 YOU WON AN ACCOUNT!\n"
-                f"{border}\n\n"
-                f"🏆 REWARD:\n"
-                f"{label}\n\n"
-                f"{border}\n\n"
-                f"<code>{account}</code>\n\n"
-                f"{border}\n\n"
-                f"⚠️ Keep this private — do not share it.\n\n"
-                f"{border}"
-            ),
-            parse_mode="HTML"
-        )
+        _send_account_dm(bot_instance, uid, account, label)
         return True
     except Exception:
-        # User hasn't started the bot — return account to pool
-        pool_add_lines([account])
+        # DM not yet possible — hold the account for this user
+        key = str(uid)
+        pending_prizes.setdefault(key, []).append(account)
+        save_data()
         return False
 
 # =========================================================
@@ -1102,6 +1138,7 @@ def start(update, context):
     user = update.effective_user
     uid  = user.id
     record_name(uid, user)
+    deliver_pending_prizes(context.bot, uid)
 
     # Detect invite deep-link: /start inv_USERID
     args = context.args or []
@@ -5139,13 +5176,20 @@ dp.add_handler(
 _tracker_save_counter = 0
 
 def track_any_message(update, context):
-    """Record every user who sends any message — builds the uid/username registry."""
+    """Record every user who sends any message — builds the uid/username registry.
+    Also delivers any pending prizes the moment the user is reachable."""
     global _tracker_save_counter
     user = update.effective_user
     if user and not user.is_bot:
         register_user(user.id, user)
+        # Deliver any queued prizes now that we know the user is active
+        if str(user.id) in pending_prizes:
+            threading.Thread(
+                target=deliver_pending_prizes,
+                args=(context.bot, user.id),
+                daemon=True,
+            ).start()
         _tracker_save_counter += 1
-        # Persist every 20 messages to avoid constant disk writes
         if _tracker_save_counter >= 20:
             save_data()
             _tracker_save_counter = 0
