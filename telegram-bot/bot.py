@@ -355,7 +355,8 @@ _accounts_lock = threading.Lock()
 
 ACCOUNTS_POOL_FILE = "accounts_pool.txt"
 ACCOUNTS_GIVEN_FILE = "accounts_given.txt"
-ACCOUNT_COOLDOWN = 120  # 2 minutes
+ACCOUNT_COOLDOWN_PARTY  = 2    # seconds during party mode
+ACCOUNT_COOLDOWN_NORMAL = 200  # seconds normally
 unlimited_mode = False  # when True, cooldown is skipped for all users
 party_mode = False      # when True, users get 1-10 random accounts instead of 1
 
@@ -1687,9 +1688,10 @@ def getaccount(update, context):
 
     key = str(uid)
     if not unlimited_mode:
+        cooldown = ACCOUNT_COOLDOWN_PARTY if party_mode else ACCOUNT_COOLDOWN_NORMAL
         last_claim = account_claims.get(key, 0)
         elapsed = now() - last_claim
-        cooldown_remaining = ACCOUNT_COOLDOWN - elapsed
+        cooldown_remaining = cooldown - elapsed
     else:
         cooldown_remaining = 0
 
