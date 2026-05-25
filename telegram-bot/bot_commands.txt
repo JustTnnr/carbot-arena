@@ -1,0 +1,184 @@
+TELEGRAM BOT — FULL COMMAND REFERENCE
+  =======================================
+  Bot: @TnnrCPM channel bot
+  Generated: 2026-05-25
+
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   GENERAL COMMANDS  (all users)
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /start
+    Opens the bot. If clicked from an invite link, registers
+    the invite so the user can run /claimbonus.
+
+  /ping
+    Check if the bot is online and responding.
+
+  /profile
+    View your personal stats and score.
+
+  /leaderboard
+    Show the top players ranked by score.
+
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ACCOUNT COMMANDS  (all users)
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /getaccount
+    Claim a free account from the pool.
+    • Normal mode  — 1 account, 12-hour cooldown
+    • Party mode   — 1–10 random accounts, 2-second cooldown
+    • Unlimited    — no cooldown (any mode)
+    Account is sent privately to your DMs.
+
+  /poolstatus
+    Shows how many accounts are left in the pool
+    and how many have been given out total.
+
+  /invite
+    Generates your personal invite link and sends
+    it to your DMs. Share it with new members.
+
+  /claimbonus
+    After clicking someone's invite link and joining
+    the channel, run this to claim your 5 free accounts.
+    The person who invited you also gets 5 accounts.
+
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   GAME COMMANDS  (all users)
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /carquiz
+    In-chat car trivia quiz. Answer questions to earn points.
+
+  /mathquiz
+    In-chat math quiz. Fastest correct answer wins the round.
+
+  /puzzle
+    In-chat word puzzle game.
+
+  /carlogo
+    In-chat car logo guessing quiz — identify brands from images.
+
+  /mixquiz
+    In-chat mixed quiz combining multiple categories.
+
+  /bossraid
+    Start a team boss raid. Players split into teams and
+    attack the boss (15,000 HP). Winner is the team with
+    the highest average damage per player.
+    • 60 second time limit
+    • 300ms tap cooldown per player
+
+  /taprace
+    Start an in-chat tap race. Players compete by tapping
+    fastest before the timer runs out.
+
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   WEB GAME COMMANDS  (all users)
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /webtap
+    Opens the browser-based tap race game.
+
+  /webraid
+    Opens the browser-based team raid game.
+
+  /startrace
+    Starts the active web tap race session.
+
+  /webcarquiz
+    Opens the browser-based car quiz.
+
+  /webmathquiz
+    Opens the browser-based math quiz.
+
+  /webpuzzle
+    Opens the browser-based puzzle game.
+
+  /webcarlogo
+    Opens the browser-based car logo quiz.
+
+  /webmixquiz
+    Opens the browser-based mixed quiz.
+
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ADMIN-ONLY COMMANDS
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /unlimited
+    Toggle cooldown on/off for /getaccount.
+    ON  — users can claim with zero wait time.
+    OFF — normal cooldown restored (12 hrs / 2 secs).
+
+  /party
+    Toggle party mode for /getaccount.
+    ON  — users get 1–10 random accounts + public shoutout in chat.
+          Cooldown drops to 2 seconds.
+    OFF — back to 1 account per claim, 12-hour cooldown.
+
+  /inviteinfo
+    Posts a formatted explanation of the invite system
+    (rewards, rules, how-to) to the announcement channel.
+
+  /extrafromchange
+    One-time command. Reads the accounts log, finds every
+    user who received an invite bonus under the old 2-account
+    system, and DMs them 3 extra accounts to make up the
+    difference to the new 5-account reward.
+
+  /flashgiveaway
+    Start a flash giveaway event in the channel.
+
+  /giveaway
+    Start a standard giveaway event.
+
+  /premium
+    Start a premium account giveaway.
+
+  /announce <message>
+    Send a message to the announcement channel.
+    Can also be used as a reply to another message.
+    Usage: /announce your text here
+           (or reply to any message with /announce)
+
+  /startraid
+    Manually force-start the current boss raid
+    without waiting for the lobby countdown.
+
+  /starttap
+    Manually force-start the current tap race.
+
+  /stoptap
+    Stop and cancel the current tap race.
+
+  /players
+    List all players currently in the tap race lobby.
+
+  /tapstatus
+    Show the current status of the tap race session.
+
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   INVITE SYSTEM — QUICK REFERENCE
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. Admin or user runs /invite  →  bot DMs them their link
+  2. They share the link with a new member
+  3. New member clicks link  →  opens bot, invite is registered
+  4. New member joins @TnnrCPM channel
+  5. New member runs /claimbonus
+     →  New member gets 5 accounts
+     →  Inviter gets 5 accounts
+
+  Rules:
+    • New member must be joining @TnnrCPM for the first time
+    • Each person can only claim the invite bonus once
+    • You cannot use your own invite link
+    • All accounts are delivered via DM
+  

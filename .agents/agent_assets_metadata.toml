@@ -12,3 +12,9 @@ id = "M2ki6rtDVVfYPjnFXttIy"
 uri = "file://telegram-bot/accounts_leaderboard.txt"
 type = "text"
 title = "Accounts Given — Leaderboard"
+
+[[outputs]]
+id = "QMPmq8CnMPjkf4ugLduCn"
+uri = "file://telegram-bot/bot_commands.txt"
+type = "text"
+title = "Bot Command Reference"
