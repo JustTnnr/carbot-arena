@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["nodejs_22"]
+
+[phases.install]
+cmds = ["echo skip"]
+
+[phases.build]
+cmds = ["echo pre-built"]
+
+[start]
+cmd = "node --enable-source-maps ./dist/index.mjs"

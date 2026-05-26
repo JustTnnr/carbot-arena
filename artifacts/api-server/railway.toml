@@ -1,7 +1,2 @@
 [build]
-builder = "railpack"
-buildCommand = "echo 'pre-built'"
-
-[deploy]
-startCommand = "node --enable-source-maps ./dist/index.mjs"
-restartPolicyType = "always"
+builder = "nixpacks"

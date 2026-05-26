@@ -3,5 +3,5 @@ builder = "railpack"
 buildCommand = "echo 'pre-built'"
 
 [deploy]
-startCommand = "node ./serve-dist.mjs"
+startCommand = "/mise/shims/node ./serve-dist.mjs"
 restartPolicyType = "always"
