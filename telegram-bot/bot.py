@@ -306,7 +306,25 @@ EXTRA_ADMIN = 8650959684
 # Announcement channel — bot must be admin in this channel
 ANNOUNCE_CHANNEL = os.environ.get("ANNOUNCE_CHANNEL", "@TnnrCPM")
 
-DATA_FILE = "bot_data.json"
+# =========================================================
+# PERSISTENT DATA DIRECTORY
+# On Replit: same folder as bot.py (default)
+# On Railway: set BOT_DATA_DIR=/data and attach a volume at /data
+# =========================================================
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.environ.get("BOT_DATA_DIR", _SCRIPT_DIR)
+os.makedirs(DATA_DIR, exist_ok=True)
+
+# Files that must exist in DATA_DIR — copied from repo on first run if missing
+_SEED_FILES = ["bot_data.json", "accounts_pool.txt", "accounts_given.txt", "bot_control.json"]
+for _sf in _SEED_FILES:
+    _dst = os.path.join(DATA_DIR, _sf)
+    _src = os.path.join(_SCRIPT_DIR, _sf)
+    if not os.path.exists(_dst) and os.path.exists(_src):
+        import shutil
+        shutil.copy2(_src, _dst)
+
+DATA_FILE = os.path.join(DATA_DIR, "bot_data.json")
 
 # =========================================================
 # GLOBAL DATA
@@ -357,8 +375,8 @@ _accounts_lock = threading.Lock()
 # ACCOUNT DISTRIBUTION CONFIG
 # =========================================================
 
-ACCOUNTS_POOL_FILE = "accounts_pool.txt"
-ACCOUNTS_GIVEN_FILE = "accounts_given.txt"
+ACCOUNTS_POOL_FILE = os.path.join(DATA_DIR, "accounts_pool.txt")
+ACCOUNTS_GIVEN_FILE = os.path.join(DATA_DIR, "accounts_given.txt")
 ACCOUNT_COOLDOWN_PARTY  = 2    # seconds during party mode
 ACCOUNT_COOLDOWN_NORMAL = 43200  # 12 hours normally
 unlimited_mode = False  # when True, cooldown is skipped for all users
@@ -637,10 +655,11 @@ def is_admin(update):
 
 def safe_name(user):
 
+    name = (user.first_name or "").strip()
     if user.username:
-        return f"@{user.username}"
+        return f"{name} (@{user.username})" if name else f"@{user.username}"
 
-    return user.first_name
+    return name or "Unknown"
 
 def format_time(sec):
 
@@ -2348,7 +2367,7 @@ def extrafromchange(update, context):
     EXTRA = 3  # how many extra accounts to give each affected user
 
     # Parse accounts_given.txt for UIDs that received an invite bonus
-    log_path = os.path.join(os.path.dirname(__file__), "accounts_given.txt")
+    log_path = ACCOUNTS_GIVEN_FILE
     try:
         with open(log_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
@@ -5474,7 +5493,7 @@ def _write_live_state():
                 "marathon_active": marathon_active,
                 "timestamp": time.time(),
             }
-            with open("bot_live.json", "w") as _f:
+            with open(os.path.join(DATA_DIR, "bot_live.json"), "w") as _f:
                 json.dump(state, _f)
         except Exception:
             pass
@@ -5486,7 +5505,7 @@ threading.Thread(target=_write_live_state, daemon=True).start()
 # CONTROL POLLER (admin dashboard force-stop commands)
 # =========================================================
 
-CONTROL_FILE = "bot_control.json"
+CONTROL_FILE = os.path.join(DATA_DIR, "bot_control.json")
 
 def _apply_stop(kind):
     global taprace_active, taprace_started, taprace_match, taprace_taps
