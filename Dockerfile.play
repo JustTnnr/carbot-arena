@@ -1,8 +1,7 @@
-FROM node:20-alpine
+FROM node:20-slim
+RUN npm install -g pnpm@9
 WORKDIR /app
-RUN npm install -g pnpm
 COPY . .
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @workspace/play run build
-RUN npm install -g serve
-CMD ["sh", "-c", "serve artifacts/play/dist -l $PORT"]
+CMD ["sh", "-c", "cd /app/artifacts/play && node_modules/.bin/vite preview --host 0.0.0.0 --port ${PORT:-3000}"]
