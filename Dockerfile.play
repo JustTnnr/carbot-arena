@@ -1,13 +1,5 @@
-FROM node:22-slim AS builder
-WORKDIR /app
-RUN npm install -g pnpm@9 --quiet
-COPY . .
-RUN NODE_ENV=development pnpm install --no-frozen-lockfile --silent
-RUN pnpm --filter @workspace/play run build
-
 FROM node:22-slim
 WORKDIR /app
 RUN npm install -g serve --quiet
-COPY --from=builder /app/artifacts/play/dist/public ./public
-EXPOSE 3000
+COPY artifacts/play/dist/public ./public
 CMD ["sh", "-c", "serve -s public -l ${PORT:-3000}"]
