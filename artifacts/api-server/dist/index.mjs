@@ -38443,7 +38443,8 @@ router3.post("/play/session", (req, res) => {
   latestByChat.set(chatKey(body.chatId, type), sessionId);
   const base = getPublicBaseUrl();
   const slug = type;
-  const url = `${base}/play/${slug}/${sessionId}`;
+  const pathPrefix = process.env["PUBLIC_BASE_URL"] ? "" : "/play";
+  const url = `${base}${pathPrefix}/${slug}/${sessionId}`;
   res.json({ sessionId, url });
 });
 router3.post("/play/session/:id/start", (req, res) => {
