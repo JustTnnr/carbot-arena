@@ -38116,6 +38116,8 @@ var QUIZ_QUESTIONS = 10;
 var QUIZ_Q_MS = 15e3;
 var QUIZ_REVEAL_MS = 3e3;
 function getPublicBaseUrl() {
+  const explicit = process.env["PUBLIC_BASE_URL"];
+  if (explicit) return explicit.replace(/\/$/, "");
   const domains = process.env["REPLIT_DOMAINS"];
   if (domains) {
     const first = domains.split(",")[0];
