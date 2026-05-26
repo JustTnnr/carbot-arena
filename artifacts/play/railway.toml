@@ -1,7 +1,5 @@
 [build]
-builder = "railpack"
-buildCommand = "echo 'pre-built'"
+builder = "nixpacks"
 
 [deploy]
-startCommand = "/mise/shims/node ./serve-dist.mjs"
 restartPolicyType = "always"
