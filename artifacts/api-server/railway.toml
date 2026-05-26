@@ -1,7 +1,7 @@
 [build]
-builder = "nixpacks"
-buildCommand = "pnpm install --frozen-lockfile && pnpm --filter @workspace/api-server run build"
+builder = "railpack"
+buildCommand = "echo 'pre-built'"
 
 [deploy]
-startCommand = "pnpm --filter @workspace/api-server run start"
+startCommand = "node --enable-source-maps ./dist/index.mjs"
 restartPolicyType = "always"

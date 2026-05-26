@@ -1,7 +1,7 @@
 [build]
-builder = "nixpacks"
-buildCommand = "pnpm install --frozen-lockfile && pnpm --filter @workspace/play run build"
+builder = "railpack"
+buildCommand = "echo 'pre-built'"
 
 [deploy]
-startCommand = "cd /app/artifacts/play && node_modules/.bin/vite preview --host 0.0.0.0 --port $PORT"
+startCommand = "node ./serve-dist.mjs"
 restartPolicyType = "always"
